@@ -1,0 +1,877 @@
+<!DOCTYPE html>
+
+<html lang="en">
+
+<head>
+
+<meta charset="UTF-8">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>VISAGE — Face Rating Study</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,400;1,700&family=JetBrains+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<style>
+
+  :root {
+
+    --black: #080808;
+
+    --deep: #0f0f0f;
+
+    --surface: #161616;
+
+    --border: #2a2a2a;
+
+    --muted: #3a3a3a;
+
+    --text-dim: #888;
+
+    --text: #d4d4d4;
+
+    --white: #f0ead6;
+
+    --gold: #c9a84c;
+
+    --gold-light: #e2c77a;
+
+    --gold-dim: #6b5520;
+
+    --red: #c0392b;
+
+    --green: #27ae60;
+
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  html, body { height: 100%; background: var(--black); color: var(--text); font-family: 'JetBrains Mono', monospace; font-size: 13px; line-height: 1.6; overflow-x: hidden; }
+
+  body::before { content: ''; position: fixed; inset: 0; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E"); pointer-events: none; z-index: 9999; opacity: 0.4; }
+
+  .screen { display: none; min-height: 100vh; animation: fadeIn 0.5s ease; }
+
+  .screen.active { display: flex; flex-direction: column; }
+
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+  .app-header { display: flex; align-items: center; justify-content: space-between; padding: 20px 32px; border-bottom: 1px solid var(--border); background: var(--deep); position: sticky; top: 0; z-index: 100; }
+
+  .logo { font-family: 'Playfair Display', serif; font-size: 22px; font-weight: 900; color: var(--gold); letter-spacing: 8px; text-transform: uppercase; }
+
+  .logo span { color: var(--white); }
+
+  .header-meta { font-size: 11px; color: var(--text-dim); letter-spacing: 2px; text-transform: uppercase; }
+
+  .btn { display: inline-flex; align-items: center; gap: 8px; padding: 12px 28px; border: 1px solid var(--gold-dim); background: transparent; color: var(--gold); font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 2px; text-transform: uppercase; cursor: pointer; transition: all 0.2s ease; outline: none; }
+
+  .btn:hover { background: var(--gold); color: var(--black); border-color: var(--gold); }
+
+  .btn.btn-primary { background: var(--gold); color: var(--black); border-color: var(--gold); font-weight: 500; }
+
+  .btn.btn-primary:hover { background: var(--gold-light); border-color: var(--gold-light); }
+
+  .btn.btn-ghost { border-color: var(--border); color: var(--text-dim); }
+
+  .btn.btn-ghost:hover { border-color: var(--text-dim); color: var(--text); background: transparent; }
+
+  .btn.btn-danger { border-color: var(--red); color: var(--red); }
+
+  .btn.btn-danger:hover { background: var(--red); color: #fff; }
+
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; pointer-events: none; }
+
+  input[type="text"], input[type="password"], textarea, select { width: 100%; background: var(--surface); border: 1px solid var(--border); color: var(--white); font-family: 'JetBrains Mono', monospace; font-size: 13px; padding: 12px 16px; outline: none; transition: border-color 0.2s; }
+
+  input[type="text"]:focus, input[type="password"]:focus, textarea:focus { border-color: var(--gold); }
+
+  textarea { resize: vertical; min-height: 90px; }
+
+  input::placeholder, textarea::placeholder { color: var(--muted); }
+
+  label { display: block; font-size: 10px; letter-spacing: 2px; text-transform: uppercase; color: var(--text-dim); margin-bottom: 8px; }
+
+  .field { margin-bottom: 20px; }
+
+  .divider { height: 1px; background: linear-gradient(90deg, transparent, var(--gold-dim), transparent); margin: 32px 0; }
+
+  #toast { position: fixed; bottom: 32px; right: 32px; padding: 14px 24px; background: var(--surface); border: 1px solid var(--gold-dim); color: var(--gold); font-size: 12px; letter-spacing: 1px; z-index: 10000; transform: translateY(20px); opacity: 0; transition: all 0.3s ease; pointer-events: none; max-width: 340px; }
+
+  #toast.show { transform: translateY(0); opacity: 1; }
+
+  #toast.error { border-color: var(--red); color: #ff6b6b; }
+
+  #toast.success { border-color: var(--green); color: #6bffaa; }
+
+  ::-webkit-scrollbar { width: 4px; }
+
+  ::-webkit-scrollbar-track { background: var(--deep); }
+
+  ::-webkit-scrollbar-thumb { background: var(--muted); }
+
+  ::-webkit-scrollbar-thumb:hover { background: var(--gold-dim); }
+
+
+
+  /* LANDING */
+
+  #screen-landing { align-items: center; justify-content: center; text-align: center; position: relative; overflow: hidden; }
+
+  #screen-landing::before { content: 'VISAGE'; position: absolute; font-family: 'Playfair Display', serif; font-size: clamp(100px, 18vw, 260px); font-weight: 900; color: transparent; -webkit-text-stroke: 1px var(--border); letter-spacing: 20px; top: 50%; left: 50%; transform: translate(-50%, -50%); pointer-events: none; user-select: none; white-space: nowrap; }
+
+  .landing-content { position: relative; z-index: 1; max-width: 500px; padding: 40px; }
+
+  .landing-title { font-family: 'Playfair Display', serif; font-size: clamp(36px, 6vw, 64px); font-weight: 900; color: var(--white); line-height: 1.05; margin-bottom: 12px; }
+
+  .landing-title em { color: var(--gold); font-style: italic; }
+
+  .landing-subtitle { font-size: 11px; letter-spacing: 3px; color: var(--text-dim); text-transform: uppercase; margin-bottom: 48px; }
+
+  .landing-actions { display: flex; flex-direction: column; gap: 12px; align-items: center; }
+
+  .landing-actions .btn { width: 260px; justify-content: center; }
+
+  .decor-lines { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+
+  .decor-lines::before { content: ''; position: absolute; top: 0; left: 50%; width: 1px; height: 100%; background: linear-gradient(180deg, transparent, var(--gold-dim), transparent); opacity: 0.3; }
+
+
+
+  /* DB STATUS PILL */
+
+  .db-pill { display: inline-flex; align-items: center; gap: 6px; font-size: 10px; letter-spacing: 1.5px; color: var(--text-dim); padding: 5px 12px; border: 1px solid var(--border); }
+
+  .db-pill .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--muted); flex-shrink: 0; }
+
+  .db-pill.connected .dot { background: var(--green); box-shadow: 0 0 6px var(--green); }
+
+  .db-pill.error .dot { background: var(--red); }
+
+
+
+  /* LOADING OVERLAY */
+
+  #loading-overlay { position: fixed; inset: 0; background: var(--black); z-index: 5000; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 20px; }
+
+  #loading-overlay.hidden { display: none; }
+
+  .loading-logo { font-family: 'Playfair Display', serif; font-size: 28px; font-weight: 900; color: var(--gold); letter-spacing: 12px; }
+
+  .loading-bar { width: 200px; height: 1px; background: var(--border); position: relative; overflow: hidden; }
+
+  .loading-bar::after { content: ''; position: absolute; top: 0; left: -100%; width: 100%; height: 100%; background: linear-gradient(90deg, transparent, var(--gold), transparent); animation: loadSlide 1.2s ease infinite; }
+
+  @keyframes loadSlide { to { left: 100%; } }
+
+  .loading-msg { font-size: 10px; letter-spacing: 2px; color: var(--text-dim); }
+
+
+
+  /* ADMIN LOGIN */
+
+  #screen-admin-login { align-items: center; justify-content: center; }
+
+  .login-box { width: 400px; padding: 48px 40px; border: 1px solid var(--border); background: var(--deep); position: relative; }
+
+  .login-box::before { content: ''; position: absolute; top: -1px; left: 40px; right: 40px; height: 2px; background: linear-gradient(90deg, transparent, var(--gold), transparent); }
+
+  .login-header { text-align: center; margin-bottom: 36px; }
+
+  .login-header .logo { font-size: 18px; letter-spacing: 10px; display: block; margin-bottom: 8px; }
+
+  .login-header p { font-size: 11px; letter-spacing: 1.5px; color: var(--text-dim); }
+
+  .returning-participant { background: rgba(201,168,76,0.06); border: 1px solid var(--gold-dim); padding: 12px 16px; margin-top: 16px; font-size: 12px; color: var(--gold); display: none; }
+
+
+
+  /* ADMIN */
+
+  #screen-admin { flex-direction: column; }
+
+  .admin-layout { display: grid; grid-template-columns: 260px 1fr; flex: 1; min-height: 0; }
+
+  .admin-sidebar { background: var(--deep); border-right: 1px solid var(--border); padding: 32px 24px; display: flex; flex-direction: column; gap: 4px; }
+
+  .sidebar-section { font-size: 9px; letter-spacing: 3px; text-transform: uppercase; color: var(--gold-dim); padding: 16px 12px 8px; }
+
+  .sidebar-btn { padding: 10px 12px; background: transparent; border: none; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; font-size: 12px; cursor: pointer; text-align: left; border-left: 2px solid transparent; transition: all 0.15s; letter-spacing: 0.5px; }
+
+  .sidebar-btn:hover { color: var(--text); border-left-color: var(--muted); }
+
+  .sidebar-btn.active { color: var(--gold); border-left-color: var(--gold); background: rgba(201,168,76,0.05); }
+
+  .admin-main { padding: 40px; overflow-y: auto; }
+
+  .panel-title { font-family: 'Playfair Display', serif; font-size: 28px; font-weight: 700; color: var(--white); margin-bottom: 4px; }
+
+  .panel-desc { color: var(--text-dim); font-size: 12px; margin-bottom: 32px; letter-spacing: 0.5px; }
+
+  .admin-panel { display: none; }
+
+  .admin-panel.active { display: block; }
+
+
+
+  /* Celeb Grid */
+
+  .celeb-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; margin-top: 16px; }
+
+  .celeb-card { background: var(--surface); border: 1px solid var(--border); padding: 16px; transition: border-color 0.2s; }
+
+  .celeb-card:hover { border-color: var(--muted); }
+
+  .celeb-name-input { margin-bottom: 12px; }
+
+  .photo-slots { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
+
+  .photo-slot { aspect-ratio: 1; background: var(--deep); border: 1px dashed var(--muted); display: flex; align-items: center; justify-content: center; cursor: pointer; position: relative; overflow: hidden; transition: border-color 0.2s; }
+
+  .photo-slot:hover { border-color: var(--gold-dim); }
+
+  .photo-slot input[type="file"] { display: none; }
+
+  .photo-slot img { width: 100%; height: 100%; object-fit: cover; }
+
+  .photo-slot .slot-icon { font-size: 18px; color: var(--muted); }
+
+  .photo-slot .remove-photo { position: absolute; top: 2px; right: 2px; width: 18px; height: 18px; background: var(--red); border: none; color: #fff; font-size: 10px; cursor: pointer; display: none; align-items: center; justify-content: center; line-height: 1; padding: 0; }
+
+  .photo-slot:hover .remove-photo { display: flex; }
+
+  .celeb-row-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+
+  .celeb-id-badge { font-size: 9px; letter-spacing: 2px; color: var(--gold-dim); text-transform: uppercase; }
+
+  .photo-count { font-size: 10px; color: var(--text-dim); margin-top: 8px; letter-spacing: 1px; }
+
+  .photo-count span { color: var(--gold); }
+
+
+
+  /* Stats */
+
+  .stats-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 16px; margin-bottom: 32px; }
+
+  .stat-card { background: var(--surface); border: 1px solid var(--border); padding: 20px; }
+
+  .stat-value { font-family: 'Playfair Display', serif; font-size: 36px; font-weight: 700; color: var(--gold); line-height: 1; margin-bottom: 4px; }
+
+  .stat-label { font-size: 10px; letter-spacing: 2px; text-transform: uppercase; color: var(--text-dim); }
+
+
+
+  /* Results Table */
+
+  .results-table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+
+  .results-table th { text-align: left; font-size: 9px; letter-spacing: 2px; text-transform: uppercase; color: var(--gold-dim); padding: 10px 14px; border-bottom: 1px solid var(--border); }
+
+  .results-table td { padding: 12px 14px; border-bottom: 1px solid var(--border); font-size: 12px; color: var(--text); vertical-align: middle; }
+
+  .results-table tr:hover td { background: rgba(255,255,255,0.02); }
+
+  .rating-badge { display: inline-block; padding: 3px 10px; background: rgba(201,168,76,0.1); border: 1px solid var(--gold-dim); color: var(--gold); font-size: 11px; }
+
+  .progress-fill-mini { height: 3px; background: var(--border); border-radius: 2px; overflow: hidden; margin-top: 4px; }
+
+  .progress-fill-mini-inner { height: 100%; background: var(--gold); transition: width 0.4s ease; }
+
+
+
+  /* Shuffle */
+
+  .shuffle-preview { background: var(--surface); border: 1px solid var(--border); padding: 16px; margin-top: 16px; font-size: 11px; color: var(--text-dim); max-height: 200px; overflow-y: auto; }
+
+  .shuffle-item { padding: 4px 0; border-bottom: 1px solid var(--border); display: flex; gap: 12px; }
+
+  .shuffle-item:last-child { border-bottom: none; }
+
+  .shuffle-item .idx { color: var(--muted); width: 30px; flex-shrink: 0; }
+
+  .shuffle-item .cid { color: var(--gold); }
+
+
+
+  /* Modal */
+
+  .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.92); z-index: 1000; align-items: center; justify-content: center; padding: 32px; }
+
+  .modal-overlay.open { display: flex; animation: fadeIn 0.2s ease; }
+
+  .modal-box { background: var(--deep); border: 1px solid var(--border); max-width: 900px; width: 100%; max-height: 90vh; overflow-y: auto; padding: 32px; position: relative; }
+
+  .modal-close { position: absolute; top: 16px; right: 16px; background: none; border: none; color: var(--text-dim); font-size: 20px; cursor: pointer; line-height: 1; }
+
+  .modal-close:hover { color: var(--white); }
+
+  .modal-image { width: 200px; height: 200px; object-fit: cover; border: 1px solid var(--border); float: left; margin: 0 24px 16px 0; }
+
+  .comment-list { margin-top: 16px; }
+
+  .comment-item { padding: 12px 16px; border-left: 2px solid var(--gold-dim); background: var(--surface); margin-bottom: 8px; }
+
+  .comment-participant { font-size: 10px; color: var(--gold); letter-spacing: 1px; margin-bottom: 4px; }
+
+  .comment-rating { float: right; color: var(--gold); font-size: 12px; }
+
+  .comment-text { color: var(--text-dim); font-size: 12px; }
+
+
+
+  /* Participant Login */
+
+  #screen-login { align-items: center; justify-content: center; position: relative; overflow: hidden; }
+
+  #screen-login::after { content: ''; position: absolute; width: 500px; height: 500px; border-radius: 50%; background: radial-gradient(circle, rgba(201,168,76,0.04) 0%, transparent 70%); top: 50%; left: 50%; transform: translate(-50%, -50%); pointer-events: none; }
+
+
+
+  /* Rating Screen */
+
+  #screen-rating { flex-direction: column; min-height: 100vh; }
+
+  .rating-layout { display: grid; grid-template-columns: 1fr 420px; flex: 1; min-height: 0; height: calc(100vh - 65px); }
+
+  .image-panel { position: relative; background: #000; overflow: hidden; display: flex; align-items: center; justify-content: center; }
+
+  .image-panel img { max-width: 100%; max-height: 100%; object-fit: contain; display: block; transition: opacity 0.4s ease; }
+
+  .image-panel img.fading { opacity: 0; }
+
+  .image-counter { position: absolute; bottom: 20px; left: 20px; font-size: 11px; letter-spacing: 2px; color: rgba(255,255,255,0.4); }
+
+  .image-corner-decorator { position: absolute; top: 20px; right: 20px; width: 40px; height: 40px; border-top: 1px solid var(--gold-dim); border-right: 1px solid var(--gold-dim); }
+
+  .image-corner-bl { position: absolute; bottom: 20px; right: 20px; width: 40px; height: 40px; border-bottom: 1px solid var(--gold-dim); border-right: 1px solid var(--gold-dim); }
+
+  .eval-panel { background: var(--deep); border-left: 1px solid var(--border); display: flex; flex-direction: column; overflow-y: auto; }
+
+  .eval-header { padding: 28px 32px 20px; border-bottom: 1px solid var(--border); }
+
+  .eval-title { font-family: 'Playfair Display', serif; font-size: 20px; font-weight: 700; color: var(--white); margin-bottom: 2px; }
+
+  .eval-subtitle { font-size: 10px; letter-spacing: 2px; color: var(--text-dim); text-transform: uppercase; }
+
+  .eval-body { padding: 28px 32px; flex: 1; }
+
+  .progress-section { margin-bottom: 28px; }
+
+  .progress-label { display: flex; justify-content: space-between; font-size: 10px; letter-spacing: 1.5px; color: var(--text-dim); text-transform: uppercase; margin-bottom: 8px; }
+
+  .progress-track { height: 2px; background: var(--muted); position: relative; }
+
+  .progress-fill { height: 100%; background: linear-gradient(90deg, var(--gold-dim), var(--gold)); transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1); }
+
+  .progress-milestones { display: flex; justify-content: space-between; margin-top: 6px; }
+
+  .milestone { width: 4px; height: 4px; background: var(--muted); border-radius: 50%; }
+
+  .milestone.reached { background: var(--gold); }
+
+  .rating-section { margin-bottom: 24px; }
+
+  .rating-label { font-size: 10px; letter-spacing: 2px; text-transform: uppercase; color: var(--text-dim); margin-bottom: 14px; display: flex; justify-content: space-between; align-items: center; }
+
+  .rating-value-display { color: var(--gold); font-size: 16px; font-family: 'Playfair Display', serif; font-weight: 700; }
+
+  .stars { display: flex; gap: 5px; flex-wrap: wrap; }
+
+  .star { width: 30px; height: 30px; background: none; border: 1px solid var(--muted); color: var(--muted); font-size: 11px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.15s; font-family: 'JetBrains Mono', monospace; }
+
+  .star:hover, .star.active { background: var(--gold); border-color: var(--gold); color: var(--black); }
+
+  .rating-slider { -webkit-appearance: none; appearance: none; width: 100%; height: 2px; background: var(--muted); outline: none; margin: 12px 0; cursor: pointer; }
+
+  .rating-slider::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 20px; height: 20px; background: var(--gold); cursor: pointer; border-radius: 0; border: 2px solid var(--black); box-shadow: 0 0 0 1px var(--gold); }
+
+  .rating-slider::-moz-range-thumb { width: 20px; height: 20px; background: var(--gold); cursor: pointer; border-radius: 0; border: 2px solid var(--black); }
+
+  .slider-ticks { display: flex; justify-content: space-between; font-size: 9px; color: var(--muted); letter-spacing: 1px; margin-top: 4px; }
+
+  .commentary-section { margin-bottom: 28px; }
+
+  .char-count { font-size: 10px; color: var(--text-dim); text-align: right; margin-top: 6px; }
+
+  .eval-footer { padding: 20px 32px 28px; border-top: 1px solid var(--border); }
+
+  .next-btn { width: 100%; justify-content: center; padding: 16px; font-size: 12px; letter-spacing: 3px; }
+
+  .image-placeholder { width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; color: var(--muted); min-height: 300px; }
+
+  .image-placeholder .big-icon { font-size: 48px; opacity: 0.3; }
+
+  .image-placeholder p { font-size: 11px; letter-spacing: 1px; }
+
+
+
+  /* Complete Screen */
+
+  #screen-complete { align-items: center; justify-content: center; text-align: center; position: relative; overflow: hidden; }
+
+  .complete-content { position: relative; z-index: 1; max-width: 520px; padding: 40px; }
+
+  .complete-icon { font-size: 48px; margin-bottom: 24px; display: block; }
+
+  .complete-title { font-family: 'Playfair Display', serif; font-size: 48px; font-weight: 900; color: var(--white); margin-bottom: 8px; line-height: 1.1; }
+
+  .complete-title em { color: var(--gold); font-style: italic; }
+
+  .complete-subtitle { font-size: 11px; letter-spacing: 2px; color: var(--text-dim); text-transform: uppercase; margin-bottom: 40px; }
+
+  .complete-stats { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1px; background: var(--border); border: 1px solid var(--border); margin-bottom: 40px; }
+
+  .complete-stat { background: var(--deep); padding: 20px 16px; }
+
+  .complete-stat-val { font-family: 'Playfair Display', serif; font-size: 28px; font-weight: 700; color: var(--gold); }
+
+  .complete-stat-lbl { font-size: 9px; letter-spacing: 1.5px; text-transform: uppercase; color: var(--text-dim); margin-top: 4px; }
+
+  .json-actions { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 8px; }
+
+
+
+  /* SQL Helper block */
+
+  .sql-block { background: var(--surface); border: 1px solid var(--border); border-left: 3px solid var(--gold-dim); padding: 16px; margin-top: 12px; font-size: 11px; color: var(--text-dim); white-space: pre; overflow-x: auto; line-height: 1.8; }
+
+  .sql-block .kw { color: var(--gold); }
+
+  .sql-block .cm { color: var(--muted); }
+
+
+
+  /* Responsive */
+
+  @media (max-width: 900px) {
+
+    .rating-layout { grid-template-columns: 1fr; grid-template-rows: 45vh 1fr; height: auto; }
+
+    .image-panel { height: 45vh; }
+
+    .admin-layout { grid-template-columns: 1fr; }
+
+    .admin-sidebar { flex-direction: row; flex-wrap: wrap; gap: 0; padding: 12px; border-right: none; border-bottom: 1px solid var(--border); }
+
+    .sidebar-section { display: none; }
+
+    .sidebar-btn { padding: 8px 12px; border-left: none; border-bottom: 2px solid transparent; }
+
+    .sidebar-btn.active { border-bottom-color: var(--gold); border-left-color: transparent; }
+
+  }
+
+  @media (max-width: 600px) {
+
+    .admin-main { padding: 20px; }
+
+    .login-box { width: calc(100% - 32px); margin: 16px; padding: 32px 24px; }
+
+    .celeb-grid { grid-template-columns: 1fr; }
+
+    .complete-stats { grid-template-columns: 1fr; }
+
+    .app-header { padding: 14px 20px; }
+
+  }
+
+</style>
+
+</head>
+
+<body>
+
+
+
+<!-- LOADING OVERLAY -->
+
+<div id="loading-overlay">
+
+  <div class="loading-logo">VISAGE</div>
+
+  <div class="loading-bar"></div>
+
+  <div class="loading-msg" id="loading-msg">Connecting to database…</div>
+
+</div>
+
+
+
+<div id="toast"></div>
+
+
+
+<!-- ═══════════════════════════════
+
+     LANDING
+
+═══════════════════════════════ -->
+
+<div id="screen-landing" class="screen active">
+
+  <div class="decor-lines"></div>
+
+  <div class="landing-content">
+
+    <h1 class="landing-title">Face<br><em>Rating</em><br>Study</h1>
+
+    <p class="landing-subtitle">Visual Perception Research · Bangladesh</p>
+
+    <div class="landing-actions">
+
+      <button class="btn btn-primary" onclick="goToParticipantLogin()">▶ &nbsp;Begin as Participant</button>
+
+      <button class="btn" onclick="showAdminLogin()">⚙ &nbsp;Admin Panel</button>
+
+    </div>
+
+    <div style="margin-top:32px;display:flex;justify-content:center">
+
+      <div class="db-pill" id="db-status-pill">
+
+        <div class="dot"></div>
+
+        <span id="db-status-label">Connecting…</span>
+
+      </div>
+
+    </div>
+
+  </div>
+
+</div>
+
+
+
+<!-- ═══════════════════════════════
+
+     ADMIN LOGIN
+
+═══════════════════════════════ -->
+
+<div id="screen-admin-login" class="screen">
+
+  <div class="login-box">
+
+    <div class="login-header">
+
+      <span class="logo">VISAGE</span>
+
+      <p>Administrator Access Required</p>
+
+    </div>
+
+    <div class="field">
+
+      <label>Admin Password</label>
+
+      <input type="password" id="admin-pw-input" placeholder="Enter password" onkeydown="if(event.key==='Enter')verifyAdmin()">
+
+    </div>
+
+    <button class="btn btn-primary" style="width:100%;justify-content:center" onclick="verifyAdmin()">Authenticate →</button>
+
+    <div style="margin-top:16px;text-align:center">
+
+      <button class="btn btn-ghost" onclick="showScreen('landing')" style="font-size:10px;padding:8px 16px">← Back</button>
+
+    </div>
+
+    <p style="font-size:10px;color:var(--text-dim);margin-top:20px;text-align:center;line-height:1.8">
+
+      Default password: <span style="color:var(--gold)">admin123</span>
+
+    </p>
+
+  </div>
+
+</div>
+
+
+
+<!-- ═══════════════════════════════
+
+     ADMIN PANEL
+
+═══════════════════════════════ -->
+
+<div id="screen-admin" class="screen">
+
+  <div class="app-header">
+
+    <span class="logo">VISAGE <span style="font-weight:400;font-size:14px;letter-spacing:3px;color:var(--text-dim)">/ ADMIN</span></span>
+
+    <div style="display:flex;gap:12px;align-items:center">
+
+      <span class="header-meta" id="admin-status-text">—</span>
+
+      <button class="btn btn-ghost" onclick="showScreen('landing')" style="padding:8px 16px;font-size:10px">Exit</button>
+
+    </div>
+
+  </div>
+
+  <div class="admin-layout">
+
+    <div class="admin-sidebar">
+
+      <div class="sidebar-section">Manage</div>
+
+      <button class="sidebar-btn active" data-panel="upload" onclick="switchAdminPanel('upload',this)">Upload Photos</button>
+
+      <button class="sidebar-btn" data-panel="shuffle" onclick="switchAdminPanel('shuffle',this)">Generate Order</button>
+
+      <button class="sidebar-btn" data-panel="data" onclick="switchAdminPanel('data',this)">Data &amp; Export</button>
+
+      <div class="sidebar-section">Results</div>
+
+      <button class="sidebar-btn" data-panel="results" onclick="switchAdminPanel('results',this)">All Ratings</button>
+
+      <button class="sidebar-btn" data-panel="participants" onclick="switchAdminPanel('participants',this)">Participants</button>
+
+      <div class="sidebar-section">Setup</div>
+
+      <button class="sidebar-btn" data-panel="setup" onclick="switchAdminPanel('setup',this)">DB Setup</button>
+
+      <button class="sidebar-btn" data-panel="settings" onclick="switchAdminPanel('settings',this)">Configuration</button>
+
+    </div>
+
+    <div class="admin-main">
+
+
+
+      <!-- Upload -->
+
+      <div id="panel-upload" class="admin-panel active">
+
+        <div class="panel-title">Celebrity Photos</div>
+
+        <p class="panel-desc">Add up to 20 celebrities × 5 photos each = 100 images. Names and photos are saved directly to Supabase.</p>
+
+        <div style="display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap;align-items:center">
+
+          <button class="btn btn-primary" onclick="addCelebCard()">+ Add Celebrity</button>
+
+          <button class="btn" onclick="saveAllCelebs()">Save All to DB</button>
+
+          <span id="total-photo-count" style="font-size:11px;color:var(--text-dim);letter-spacing:1px"></span>
+
+        </div>
+
+        <div class="celeb-grid" id="celeb-grid"></div>
+
+      </div>
+
+
+
+      <!-- Shuffle -->
+
+      <div id="panel-shuffle" class="admin-panel">
+
+        <div class="panel-title">Generate Randomized Order</div>
+
+        <p class="panel-desc">Smart Fisher-Yates shuffle ensuring no consecutive same-celebrity images. Order is saved to Supabase study_config.</p>
+
+        <div style="display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap">
+
+          <button class="btn btn-primary" onclick="generateShuffle()">Generate &amp; Save Shuffle</button>
+
+          <button class="btn btn-ghost" onclick="clearShuffle()">Clear Order</button>
+
+        </div>
+
+        <div id="shuffle-status" style="font-size:12px;color:var(--text-dim);margin-bottom:12px;line-height:2"></div>
+
+        <div class="shuffle-preview" id="shuffle-preview" style="display:none"></div>
+
+      </div>
+
+
+
+      <!-- Data -->
+
+      <div id="panel-data" class="admin-panel">
+
+        <div class="panel-title">Data &amp; Export</div>
+
+        <p class="panel-desc">All data lives in Supabase. Export a local JSON backup or download ratings as CSV.</p>
+
+        <div class="divider"></div>
+
+        <div class="field">
+
+          <label>Export Full Backup</label>
+
+          <div class="json-actions">
+
+            <button class="btn btn-primary" onclick="exportDataset()">Export Dataset JSON</button>
+
+          </div>
+
+        </div>
+
+        <div class="divider"></div>
+
+        <div class="field">
+
+          <label>Export Ratings</label>
+
+          <div class="json-actions">
+
+            <button class="btn btn-primary" onclick="exportCSV()">Export All Ratings CSV</button>
+
+          </div>
+
+        </div>
+
+        <div class="divider"></div>
+
+        <div class="field">
+
+          <label>Danger Zone</label>
+
+          <div class="json-actions">
+
+            <button class="btn btn-danger" onclick="clearAllRatings()">Clear All Ratings</button>
+
+            <button class="btn btn-danger" onclick="clearEverything()">Clear Everything</button>
+
+          </div>
+
+        </div>
+
+      </div>
+
+
+
+      <!-- Results -->
+
+      <div id="panel-results" class="admin-panel">
+
+        <div class="panel-title">All Ratings</div>
+
+        <p class="panel-desc">Live data from Supabase. Click any row to view individual participant comments.</p>
+
+        <div id="results-content"></div>
+
+      </div>
+
+
+
+      <!-- Participants -->
+
+      <div id="panel-participants" class="admin-panel">
+
+        <div class="panel-title">Participants</div>
+
+        <p class="panel-desc">Track progress and completion status from Supabase ratings table.</p>
+
+        <div class="stats-grid" id="participants-stats"></div>
+
+        <table class="results-table">
+
+          <thead>
+
+            <tr><th>Name / ID</th><th>Progress</th><th>Status</th><th>Avg Rating</th></tr>
+
+          </thead>
+
+          <tbody id="participants-table"></tbody>
+
+        </table>
+
+      </div>
+
+
+
+      <!-- DB Setup -->
+
+      <div id="panel-setup" class="admin-panel">
+
+        <div class="panel-title">Database Setup</div>
+
+        <p class="panel-desc">Run this SQL in your Supabase SQL Editor to create the required tables.</p>
+
+        <div class="sql-block"><span class="cm">-- 1. Celebrities table</span>
+
+<span class="kw">CREATE TABLE IF NOT EXISTS</span> celebrities (
+
+  id          <span class="kw">TEXT PRIMARY KEY</span>,
+
+  name        <span class="kw">TEXT NOT NULL DEFAULT</span> <span style="color:#e2c77a">''</span>,
+
+  photos      <span class="kw">JSONB NOT NULL DEFAULT</span> <span style="color:#e2c77a">'[]'</span>,
+
+  created_at  <span class="kw">TIMESTAMPTZ DEFAULT NOW</span>()
+
+);
+
+
+
+<span class="cm">-- 2. Ratings table</span>
+
+<span class="kw">CREATE TABLE IF NOT EXISTS</span> ratings (
+
+  id               <span class="kw">UUID PRIMARY KEY DEFAULT GEN_RANDOM_UUID</span>(),
+
+  participant_id   <span class="kw">TEXT NOT NULL</span>,
+
+  participant_name <span class="kw">TEXT NOT NULL DEFAULT</span> <span style="color:#e2c77a">''</span>,
+
+  image_index      <span class="kw">INT NOT NULL</span>,
+
+  celeb_id         <span class="kw">TEXT NOT NULL DEFAULT</span> <span style="color:#e2c77a">''</span>,
+
+  celeb_name       <span class="kw">TEXT NOT NULL DEFAULT</span> <span style="color:#e2c77a">''</span>,
+
+  photo_index      <span class="kw">INT NOT NULL DEFAULT</span> 0,
+
+  rating           <span class="kw">INT NOT NULL</span>,
+
+  comment          <span class="kw">TEXT NOT NULL DEFAULT</span> <span style="color:#e2c77a">''</span>,
+
+  created_at       <span class="kw">TIMESTAMPTZ DEFAULT NOW</span>()
+
+);
+
+
+
+<span class="cm">-- 3. Study config table (single-row KV store)</span>
+
+<span class="kw">CREATE TABLE IF NOT EXISTS</span> study_config (
+
+  key        <span class="kw">TEXT PRIMARY KEY</span>,
+
+  value      <span class="kw">JSONB NOT NULL DEFAULT</span> <span style="color:#e2c77a">'null'</span>,
+
+  updated_at <span class="kw">TIMESTAMPTZ DEFAULT NOW</span>()
+
+);
+
+
+
+<span class="cm">-- 4. Disable RLS for anon access (dev mode)</span>
+
+<span class="kw">ALTER TABLE</span> celebrities  <span class="kw">ENABLE ROW LEVEL SECURITY</span>;
+
+<span class="kw">ALTER TABLE</span> ratings       <span class="kw">ENABLE ROW LEVEL SECURITY</span>;
+
+<span class="kw">ALTER TABLE</span> study_config  <span class="kw">ENABLE ROW LEVEL SECURITY</span>;
+
+
+
+<span class="kw">CREATE POLICY</span> "public_all" <span class="kw">ON</span> celebrities  <span class="kw">FOR ALL TO anon USING</span> (<span class="kw">true</span>) <span class="kw">WITH CHECK</span> (<span class="kw">true</span>);
+
+<span class="kw">CREATE POLICY</span> "public_all" <span class="kw">ON</span> ratings       <span class="kw">FOR ALL TO anon USING</span> (<span class="kw">true</span>) <span class="kw">WITH CHECK</span> (<span class="kw">true</span>);
+
+<span class="kw">CREATE POLICY</span> "public_all" <span class="kw">ON</span> study_config  <span class="kw">FOR ALL TO anon USING</span> (<span class="kw">true</span>) <span class="kw">WITH CHECK</span> (<span class="kw">true</span>);</div>
+
+        <div style="margin-top:1

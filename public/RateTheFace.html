@@ -603,15 +603,13 @@
 // ════════════════════════════════════════════════════════
 // SUPABASE INIT
 // ════════════════════════════════════════════════════════
-// ১. আপনার সঠিক URL এবং নতুন Legacy Key
+// ১. আপনার Supabase URL এবং সঠিক Legacy Key
 const SUPABASE_URL = 'https://wjufytpsvnvwqgsddstx.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWZ5dHBzdm53dnFnc2Rkc3R4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUyODg0MzgsImV4cCI6MjA5MDg2NDQzOH0.DMFVWOQJ4sfLgl3bH_gS5HNjFXV6-W70n5mDy9cAOBo';
-
-// এখানে supabaseClient এর বদলে শুধু db লিখুন
+// ২. ক্লায়েন্ট তৈরি (ভেরিয়েবল নাম 'db' রাখা হয়েছে যাতে নিচের সব ফাংশন একে চিনতে পারে)
 const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-// ৩. এরপর আপনার কোডে যেখানে যেখানে 'db' বা 'supabase' ব্যবহার করেছেন, 
-// সেখানে এই 'supabaseClient' ভেরিয়েবলটি ব্যবহার করবেন।
+
 
 // ════════════════════════════════════════════════════════
 // IN-MEMORY STATE  (mirrors the DB; refreshed on demand)
