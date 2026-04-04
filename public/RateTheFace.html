@@ -607,8 +607,8 @@
 const SUPABASE_URL = 'https://wjufytpsvnvwqgsddstx.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdWZ5dHBzdm53dnFnc2Rkc3R4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUyODg0MzgsImV4cCI6MjA5MDg2NDQzOH0.DMFVWOQJ4sfLgl3bH_gS5HNjFXV6-W70n5mDy9cAOBo';
 
-// ২. ক্লায়েন্ট তৈরি (এটি সবচেয়ে নিরাপদ পদ্ধতি)
-const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+// এখানে supabaseClient এর বদলে শুধু db লিখুন
+const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 // ৩. এরপর আপনার কোডে যেখানে যেখানে 'db' বা 'supabase' ব্যবহার করেছেন, 
 // সেখানে এই 'supabaseClient' ভেরিয়েবলটি ব্যবহার করবেন।
