@@ -4,10 +4,10 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>VISAGE — Face Rating Study</title>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,400;1,700&family=JetBrains+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
   :root {
     --black: #080808;
@@ -50,7 +50,7 @@
   label { display: block; font-size: 10px; letter-spacing: 2px; text-transform: uppercase; color: var(--text-dim); margin-bottom: 8px; }
   .field { margin-bottom: 20px; }
   .divider { height: 1px; background: linear-gradient(90deg, transparent, var(--gold-dim), transparent); margin: 32px 0; }
-  #toast { position: fixed; bottom: 32px; right: 32px; padding: 14px 24px; background: var(--surface); border: 1px solid var(--gold-dim); color: var(--gold); font-size: 12px; letter-spacing: 1px; z-index: 10000; transform: translateY(20px); opacity: 0; transition: all 0.3s ease; pointer-events: none; max-width: 320px; }
+  #toast { position: fixed; bottom: 32px; right: 32px; padding: 14px 24px; background: var(--surface); border: 1px solid var(--gold-dim); color: var(--gold); font-size: 12px; letter-spacing: 1px; z-index: 10000; transform: translateY(20px); opacity: 0; transition: all 0.3s ease; pointer-events: none; max-width: 340px; }
   #toast.show { transform: translateY(0); opacity: 1; }
   #toast.error { border-color: var(--red); color: #ff6b6b; }
   #toast.success { border-color: var(--green); color: #6bffaa; }
@@ -70,6 +70,21 @@
   .landing-actions .btn { width: 260px; justify-content: center; }
   .decor-lines { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
   .decor-lines::before { content: ''; position: absolute; top: 0; left: 50%; width: 1px; height: 100%; background: linear-gradient(180deg, transparent, var(--gold-dim), transparent); opacity: 0.3; }
+
+  /* DB STATUS PILL */
+  .db-pill { display: inline-flex; align-items: center; gap: 6px; font-size: 10px; letter-spacing: 1.5px; color: var(--text-dim); padding: 5px 12px; border: 1px solid var(--border); }
+  .db-pill .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--muted); flex-shrink: 0; }
+  .db-pill.connected .dot { background: var(--green); box-shadow: 0 0 6px var(--green); }
+  .db-pill.error .dot { background: var(--red); }
+
+  /* LOADING OVERLAY */
+  #loading-overlay { position: fixed; inset: 0; background: var(--black); z-index: 5000; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 20px; }
+  #loading-overlay.hidden { display: none; }
+  .loading-logo { font-family: 'Playfair Display', serif; font-size: 28px; font-weight: 900; color: var(--gold); letter-spacing: 12px; }
+  .loading-bar { width: 200px; height: 1px; background: var(--border); position: relative; overflow: hidden; }
+  .loading-bar::after { content: ''; position: absolute; top: 0; left: -100%; width: 100%; height: 100%; background: linear-gradient(90deg, transparent, var(--gold), transparent); animation: loadSlide 1.2s ease infinite; }
+  @keyframes loadSlide { to { left: 100%; } }
+  .loading-msg { font-size: 10px; letter-spacing: 2px; color: var(--text-dim); }
 
   /* ADMIN LOGIN */
   #screen-admin-login { align-items: center; justify-content: center; }
@@ -147,7 +162,7 @@
   .comment-rating { float: right; color: var(--gold); font-size: 12px; }
   .comment-text { color: var(--text-dim); font-size: 12px; }
 
-  /* Login / Participant */
+  /* Participant Login */
   #screen-login { align-items: center; justify-content: center; position: relative; overflow: hidden; }
   #screen-login::after { content: ''; position: absolute; width: 500px; height: 500px; border-radius: 50%; background: radial-gradient(circle, rgba(201,168,76,0.04) 0%, transparent 70%); top: 50%; left: 50%; transform: translate(-50%, -50%); pointer-events: none; }
 
@@ -203,6 +218,11 @@
   .complete-stat-lbl { font-size: 9px; letter-spacing: 1.5px; text-transform: uppercase; color: var(--text-dim); margin-top: 4px; }
   .json-actions { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 8px; }
 
+  /* SQL Helper block */
+  .sql-block { background: var(--surface); border: 1px solid var(--border); border-left: 3px solid var(--gold-dim); padding: 16px; margin-top: 12px; font-size: 11px; color: var(--text-dim); white-space: pre; overflow-x: auto; line-height: 1.8; }
+  .sql-block .kw { color: var(--gold); }
+  .sql-block .cm { color: var(--muted); }
+
   /* Responsive */
   @media (max-width: 900px) {
     .rating-layout { grid-template-columns: 1fr; grid-template-rows: 45vh 1fr; height: auto; }
@@ -224,6 +244,13 @@
 </head>
 <body>
 
+<!-- LOADING OVERLAY -->
+<div id="loading-overlay">
+  <div class="loading-logo">VISAGE</div>
+  <div class="loading-bar"></div>
+  <div class="loading-msg" id="loading-msg">Connecting to database…</div>
+</div>
+
 <div id="toast"></div>
 
 <!-- ═══════════════════════════════
@@ -238,9 +265,12 @@
       <button class="btn btn-primary" onclick="goToParticipantLogin()">▶ &nbsp;Begin as Participant</button>
       <button class="btn" onclick="showAdminLogin()">⚙ &nbsp;Admin Panel</button>
     </div>
-    <p style="margin-top:32px;font-size:10px;color:var(--muted);letter-spacing:1px">
-      Powered by VISAGE Research Platform
-    </p>
+    <div style="margin-top:32px;display:flex;justify-content:center">
+      <div class="db-pill" id="db-status-pill">
+        <div class="dot"></div>
+        <span id="db-status-label">Connecting…</span>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -287,7 +317,8 @@
       <div class="sidebar-section">Results</div>
       <button class="sidebar-btn" data-panel="results" onclick="switchAdminPanel('results',this)">All Ratings</button>
       <button class="sidebar-btn" data-panel="participants" onclick="switchAdminPanel('participants',this)">Participants</button>
-      <div class="sidebar-section">Settings</div>
+      <div class="sidebar-section">Setup</div>
+      <button class="sidebar-btn" data-panel="setup" onclick="switchAdminPanel('setup',this)">DB Setup</button>
       <button class="sidebar-btn" data-panel="settings" onclick="switchAdminPanel('settings',this)">Configuration</button>
     </div>
     <div class="admin-main">
@@ -295,10 +326,10 @@
       <!-- Upload -->
       <div id="panel-upload" class="admin-panel active">
         <div class="panel-title">Celebrity Photos</div>
-        <p class="panel-desc">Add up to 20 celebrities × 5 photos each = 100 images. Enter each name and upload their photos.</p>
+        <p class="panel-desc">Add up to 20 celebrities × 5 photos each = 100 images. Names and photos are saved directly to Supabase.</p>
         <div style="display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap;align-items:center">
           <button class="btn btn-primary" onclick="addCelebCard()">+ Add Celebrity</button>
-          <button class="btn" onclick="saveAllCelebs()">Save All</button>
+          <button class="btn" onclick="saveAllCelebs()">Save All to DB</button>
           <span id="total-photo-count" style="font-size:11px;color:var(--text-dim);letter-spacing:1px"></span>
         </div>
         <div class="celeb-grid" id="celeb-grid"></div>
@@ -307,9 +338,9 @@
       <!-- Shuffle -->
       <div id="panel-shuffle" class="admin-panel">
         <div class="panel-title">Generate Randomized Order</div>
-        <p class="panel-desc">Smart shuffle with Fisher-Yates algorithm ensuring no consecutive same-celebrity images appear back-to-back.</p>
+        <p class="panel-desc">Smart Fisher-Yates shuffle ensuring no consecutive same-celebrity images. Order is saved to Supabase study_config.</p>
         <div style="display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap">
-          <button class="btn btn-primary" onclick="generateShuffle()">Generate Shuffle</button>
+          <button class="btn btn-primary" onclick="generateShuffle()">Generate &amp; Save Shuffle</button>
           <button class="btn btn-ghost" onclick="clearShuffle()">Clear Order</button>
         </div>
         <div id="shuffle-status" style="font-size:12px;color:var(--text-dim);margin-bottom:12px;line-height:2"></div>
@@ -319,13 +350,11 @@
       <!-- Data -->
       <div id="panel-data" class="admin-panel">
         <div class="panel-title">Data &amp; Export</div>
-        <p class="panel-desc">Import/export the full dataset as JSON. Export ratings as CSV.</p>
+        <p class="panel-desc">All data lives in Supabase. Export a local JSON backup or download ratings as CSV.</p>
         <div class="divider"></div>
         <div class="field">
-          <label>Import Dataset (JSON)</label>
-          <input type="file" id="import-json-file" accept=".json" style="display:none" onchange="importDataset(event)">
+          <label>Export Full Backup</label>
           <div class="json-actions">
-            <button class="btn" onclick="document.getElementById('import-json-file').click()">Import JSON</button>
             <button class="btn btn-primary" onclick="exportDataset()">Export Dataset JSON</button>
           </div>
         </div>
@@ -349,14 +378,14 @@
       <!-- Results -->
       <div id="panel-results" class="admin-panel">
         <div class="panel-title">All Ratings</div>
-        <p class="panel-desc">Click any row to view all participant comments for that image.</p>
+        <p class="panel-desc">Live data from Supabase. Click any row to view individual participant comments.</p>
         <div id="results-content"></div>
       </div>
 
       <!-- Participants -->
       <div id="panel-participants" class="admin-panel">
         <div class="panel-title">Participants</div>
-        <p class="panel-desc">Track progress and completion status.</p>
+        <p class="panel-desc">Track progress and completion status from Supabase ratings table.</p>
         <div class="stats-grid" id="participants-stats"></div>
         <table class="results-table">
           <thead>
@@ -366,10 +395,57 @@
         </table>
       </div>
 
+      <!-- DB Setup -->
+      <div id="panel-setup" class="admin-panel">
+        <div class="panel-title">Database Setup</div>
+        <p class="panel-desc">Run this SQL in your Supabase SQL Editor to create the required tables.</p>
+        <div class="sql-block"><span class="cm">-- 1. Celebrities table</span>
+<span class="kw">CREATE TABLE IF NOT EXISTS</span> celebrities (
+  id          <span class="kw">TEXT PRIMARY KEY</span>,
+  name        <span class="kw">TEXT NOT NULL DEFAULT</span> <span style="color:#e2c77a">''</span>,
+  photos      <span class="kw">JSONB NOT NULL DEFAULT</span> <span style="color:#e2c77a">'[]'</span>,
+  created_at  <span class="kw">TIMESTAMPTZ DEFAULT NOW</span>()
+);
+
+<span class="cm">-- 2. Ratings table</span>
+<span class="kw">CREATE TABLE IF NOT EXISTS</span> ratings (
+  id               <span class="kw">UUID PRIMARY KEY DEFAULT GEN_RANDOM_UUID</span>(),
+  participant_id   <span class="kw">TEXT NOT NULL</span>,
+  participant_name <span class="kw">TEXT NOT NULL DEFAULT</span> <span style="color:#e2c77a">''</span>,
+  image_index      <span class="kw">INT NOT NULL</span>,
+  celeb_id         <span class="kw">TEXT NOT NULL DEFAULT</span> <span style="color:#e2c77a">''</span>,
+  celeb_name       <span class="kw">TEXT NOT NULL DEFAULT</span> <span style="color:#e2c77a">''</span>,
+  photo_index      <span class="kw">INT NOT NULL DEFAULT</span> 0,
+  rating           <span class="kw">INT NOT NULL</span>,
+  comment          <span class="kw">TEXT NOT NULL DEFAULT</span> <span style="color:#e2c77a">''</span>,
+  created_at       <span class="kw">TIMESTAMPTZ DEFAULT NOW</span>()
+);
+
+<span class="cm">-- 3. Study config table (single-row KV store)</span>
+<span class="kw">CREATE TABLE IF NOT EXISTS</span> study_config (
+  key        <span class="kw">TEXT PRIMARY KEY</span>,
+  value      <span class="kw">JSONB NOT NULL DEFAULT</span> <span style="color:#e2c77a">'null'</span>,
+  updated_at <span class="kw">TIMESTAMPTZ DEFAULT NOW</span>()
+);
+
+<span class="cm">-- 4. Disable RLS for anon access (dev mode)</span>
+<span class="kw">ALTER TABLE</span> celebrities  <span class="kw">ENABLE ROW LEVEL SECURITY</span>;
+<span class="kw">ALTER TABLE</span> ratings       <span class="kw">ENABLE ROW LEVEL SECURITY</span>;
+<span class="kw">ALTER TABLE</span> study_config  <span class="kw">ENABLE ROW LEVEL SECURITY</span>;
+
+<span class="kw">CREATE POLICY</span> "public_all" <span class="kw">ON</span> celebrities  <span class="kw">FOR ALL TO anon USING</span> (<span class="kw">true</span>) <span class="kw">WITH CHECK</span> (<span class="kw">true</span>);
+<span class="kw">CREATE POLICY</span> "public_all" <span class="kw">ON</span> ratings       <span class="kw">FOR ALL TO anon USING</span> (<span class="kw">true</span>) <span class="kw">WITH CHECK</span> (<span class="kw">true</span>);
+<span class="kw">CREATE POLICY</span> "public_all" <span class="kw">ON</span> study_config  <span class="kw">FOR ALL TO anon USING</span> (<span class="kw">true</span>) <span class="kw">WITH CHECK</span> (<span class="kw">true</span>);</div>
+        <div style="margin-top:16px">
+          <button class="btn" onclick="testConnection()">Test Connection</button>
+          <span id="conn-test-result" style="margin-left:16px;font-size:11px;color:var(--text-dim)"></span>
+        </div>
+      </div>
+
       <!-- Settings -->
       <div id="panel-settings" class="admin-panel">
         <div class="panel-title">Configuration</div>
-        <p class="panel-desc">Study settings and admin password.</p>
+        <p class="panel-desc">Study settings are stored in Supabase study_config table.</p>
         <div class="field">
           <label>Admin Password</label>
           <input type="password" id="settings-pw" placeholder="New admin password">
@@ -403,7 +479,7 @@
       </div>
       <div class="field">
         <label>Your Name / Participant ID</label>
-        <input type="text" id="participant-id-input" placeholder="e.g. Rahim, Participant_07..." onkeydown="if(event.key==='Enter')participantLogin()" oninput="checkReturning()">
+        <input type="text" id="participant-id-input" placeholder="e.g. Rahim, Participant_07…" onkeydown="if(event.key==='Enter')participantLogin()" oninput="checkReturning()">
       </div>
       <div class="returning-participant" id="returning-msg"></div>
       <button class="btn btn-primary" style="width:100%;justify-content:center;margin-top:16px" onclick="participantLogin()">Begin Study →</button>
@@ -432,7 +508,7 @@
       <div id="image-display">
         <div class="image-placeholder">
           <div class="big-icon">◈</div>
-          <p>Loading...</p>
+          <p>Loading…</p>
         </div>
       </div>
       <div class="image-counter" id="image-counter-display">— / —</div>
@@ -452,9 +528,9 @@
             <div class="progress-fill" id="progress-fill" style="width:0%"></div>
           </div>
           <div class="progress-milestones">
-            <div class="milestone" id="m25" title="25%"></div>
-            <div class="milestone" id="m50" title="50%"></div>
-            <div class="milestone" id="m75" title="75%"></div>
+            <div class="milestone" id="m25"></div>
+            <div class="milestone" id="m50"></div>
+            <div class="milestone" id="m75"></div>
           </div>
         </div>
         <div class="rating-section">
@@ -509,7 +585,7 @@
       </div>
     </div>
     <p style="font-size:12px;color:var(--text-dim);margin-bottom:32px;line-height:1.8">
-      Your responses have been saved. They will contribute to research on visual perception and facial aesthetics.
+      Your responses have been saved to our research database and will contribute to the study on visual perception and facial aesthetics.
     </p>
     <button class="btn btn-primary" onclick="showScreen('landing')">← Return to Home</button>
   </div>
@@ -524,46 +600,50 @@
 </div>
 
 <script>
-// ──────────────────────────────────────
-// STATE
-// ──────────────────────────────────────
-const STORAGE_KEY = 'visage_v2';
+// ════════════════════════════════════════════════════════
+// SUPABASE INIT
+// ════════════════════════════════════════════════════════
+const SUPABASE_URL = 'https://wjufytpsvnvwqgsddstx.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_rQk8ZpNMVP1WTUXOWKfu3w_ZcSfrehS';
+const { createClient } = supabase;
+const db = createClient(SUPABASE_URL, SUPABASE_KEY);
 
-function defaultState() {
-  return {
-    celebrities: [],
-    imageOrder: [],
-    participants: {},
-    settings: { adminPw: 'admin123', title: 'Visual Perception Study' }
-  };
-}
+// ════════════════════════════════════════════════════════
+// IN-MEMORY STATE  (mirrors the DB; refreshed on demand)
+// ════════════════════════════════════════════════════════
+let state = {
+  celebrities: [],   // [{id, name, photos:[dataURL|null,…]}]
+  imageOrder:  [],   // [{celebId, photoIdx, celebName, photo}]
+  settings:    { adminPw: 'admin123', title: 'Visual Perception Study' },
+  // participants are NOT cached globally; fetched per-query to stay live
+};
 
-function loadState() {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? JSON.parse(raw) : defaultState();
-  } catch(e) { return defaultState(); }
-}
+// Per-session participant cache (for rating flow speed)
+let participantRatingsCache = []; // [{image_index, rating, comment, …}]
 
-function saveState() {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-  } catch(e) {
-    showToast('⚠ Storage limit reached — export data to free space', 'error');
+// ════════════════════════════════════════════════════════
+// LOADING OVERLAY
+// ════════════════════════════════════════════════════════
+function setLoading(visible, msg = '') {
+  const el = document.getElementById('loading-overlay');
+  if (visible) {
+    el.classList.remove('hidden');
+    document.getElementById('loading-msg').textContent = msg || 'Working…';
+  } else {
+    el.classList.add('hidden');
   }
 }
 
-let state = loadState();
+function setDbStatus(ok, label) {
+  const pill  = document.getElementById('db-status-pill');
+  const lbl   = document.getElementById('db-status-label');
+  pill.className = 'db-pill ' + (ok ? 'connected' : 'error');
+  lbl.textContent = label;
+}
 
-// Repair state
-if (!state.settings) state.settings = { adminPw: 'admin123', title: 'Visual Perception Study' };
-if (!state.celebrities) state.celebrities = [];
-if (!state.imageOrder) state.imageOrder = [];
-if (!state.participants) state.participants = {};
-
-// ──────────────────────────────────────
+// ════════════════════════════════════════════════════════
 // TOAST
-// ──────────────────────────────────────
+// ════════════════════════════════════════════════════════
 let toastTimer;
 function showToast(msg, type = '') {
   const t = document.getElementById('toast');
@@ -573,9 +653,9 @@ function showToast(msg, type = '') {
   toastTimer = setTimeout(() => { t.className = ''; }, 3500);
 }
 
-// ──────────────────────────────────────
+// ════════════════════════════════════════════════════════
 // NAVIGATION
-// ──────────────────────────────────────
+// ════════════════════════════════════════════════════════
 function showScreen(id) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   const el = document.getElementById('screen-' + id);
@@ -593,45 +673,154 @@ function goToParticipantLogin() {
   showScreen('login');
 }
 
-function verifyAdmin() {
-  const pw = document.getElementById('admin-pw-input').value;
+async function verifyAdmin() {
+  const pw      = document.getElementById('admin-pw-input').value;
   const correct = state.settings?.adminPw || 'admin123';
-  if (pw === correct) {
-    showScreen('admin');
-    refreshAdminStats();
-    renderCelebGrid();
-  } else {
+  if (pw !== correct) {
     showToast('Invalid password', 'error');
     document.getElementById('admin-pw-input').value = '';
+    return;
   }
+  setLoading(true, 'Loading admin data…');
+  await loadCelebrities();
+  await loadConfig();
+  setLoading(false);
+  showScreen('admin');
+  refreshAdminStats();
+  renderCelebGrid();
 }
 
-// ──────────────────────────────────────
+// ════════════════════════════════════════════════════════
+// SUPABASE — CONFIG (study_config table)
+// key/value rows: "settings", "image_order"
+// ════════════════════════════════════════════════════════
+async function loadConfig() {
+  const { data, error } = await db.from('study_config').select('*');
+  if (error) { console.error('loadConfig:', error); return; }
+  data.forEach(row => {
+    if (row.key === 'settings')    state.settings   = { ...state.settings, ...row.value };
+    if (row.key === 'image_order') state.imageOrder = row.value || [];
+  });
+}
+
+async function saveConfig(key, value) {
+  const { error } = await db.from('study_config')
+    .upsert({ key, value, updated_at: new Date().toISOString() }, { onConflict: 'key' });
+  if (error) { showToast('DB error saving config: ' + error.message, 'error'); return false; }
+  return true;
+}
+
+// ════════════════════════════════════════════════════════
+// SUPABASE — CELEBRITIES
+// ════════════════════════════════════════════════════════
+async function loadCelebrities() {
+  const { data, error } = await db.from('celebrities').select('*').order('id');
+  if (error) { showToast('DB error loading celebrities: ' + error.message, 'error'); return; }
+  state.celebrities = (data || []).map(r => ({
+    id:     r.id,
+    name:   r.name,
+    photos: Array.isArray(r.photos) ? r.photos : [null,null,null,null,null],
+  }));
+}
+
+async function addCelebrity(celeb) {
+  const { error } = await db.from('celebrities')
+    .upsert({ id: celeb.id, name: celeb.name, photos: celeb.photos }, { onConflict: 'id' });
+  if (error) { showToast('DB error adding celebrity: ' + error.message, 'error'); return false; }
+  return true;
+}
+
+async function updateCelebrity(celeb) {
+  const { error } = await db.from('celebrities')
+    .upsert({ id: celeb.id, name: celeb.name, photos: celeb.photos }, { onConflict: 'id' });
+  if (error) { showToast('DB error updating celebrity: ' + error.message, 'error'); return false; }
+  return true;
+}
+
+async function deleteCelebrity(id) {
+  const { error } = await db.from('celebrities').delete().eq('id', id);
+  if (error) { showToast('DB error deleting celebrity: ' + error.message, 'error'); return false; }
+  return true;
+}
+
+// ════════════════════════════════════════════════════════
+// SUPABASE — RATINGS
+// ════════════════════════════════════════════════════════
+async function submitRatingToDB(participantId, participantName, imageIdx, img, rating, comment) {
+  const { error } = await db.from('ratings').insert({
+    participant_id:   participantId,
+    participant_name: participantName,
+    image_index:      imageIdx,
+    celeb_id:         img.celebId   || '',
+    celeb_name:       img.celebName || '',
+    photo_index:      img.photoIdx  ?? 0,
+    rating:           rating,
+    comment:          comment,
+    created_at:       new Date().toISOString(),
+  });
+  if (error) throw error;
+}
+
+async function loadParticipantRatings(participantId) {
+  const { data, error } = await db.from('ratings')
+    .select('image_index, rating, comment')
+    .eq('participant_id', participantId)
+    .order('image_index');
+  if (error) { showToast('DB error loading progress: ' + error.message, 'error'); return []; }
+  return data || [];
+}
+
+async function loadAllRatings() {
+  const { data, error } = await db.from('ratings').select('*').order('created_at');
+  if (error) { showToast('DB error loading ratings: ' + error.message, 'error'); return []; }
+  return data || [];
+}
+
+// ════════════════════════════════════════════════════════
+// APP INIT
+// ════════════════════════════════════════════════════════
+async function init() {
+  setLoading(true, 'Connecting to database…');
+  try {
+    // Light ping — try reading study_config
+    const { error } = await db.from('study_config').select('key').limit(1);
+    if (error) throw error;
+    await loadConfig();
+    setDbStatus(true, 'Supabase · Connected');
+  } catch (e) {
+    setDbStatus(false, 'DB Error — check console');
+    console.error('Supabase init error:', e);
+    showToast('⚠ Database connection failed. Check Setup tab.', 'error');
+  }
+  setLoading(false);
+}
+
+// ════════════════════════════════════════════════════════
 // ADMIN PANEL TABS
-// ──────────────────────────────────────
+// ════════════════════════════════════════════════════════
 function switchAdminPanel(name, btn) {
   document.querySelectorAll('.admin-panel').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.sidebar-btn').forEach(b => b.classList.remove('active'));
   const panel = document.getElementById('panel-' + name);
   if (panel) panel.classList.add('active');
   if (btn) btn.classList.add('active');
-  if (name === 'results') renderResults();
+  if (name === 'results')      renderResults();
   if (name === 'participants') renderParticipants();
-  if (name === 'shuffle') renderShuffleStatus();
+  if (name === 'shuffle')      renderShuffleStatus();
   if (name === 'settings') {
     document.getElementById('settings-title').value = state.settings?.title || '';
   }
 }
 
 function refreshAdminStats() {
-  const total = state.celebrities.reduce((s, c) => s + (c.photos || []).filter(Boolean).length, 0);
+  const total = state.celebrities.reduce((s, c) => s + (c.photos||[]).filter(Boolean).length, 0);
   document.getElementById('admin-status-text').textContent =
     `${state.celebrities.length} CELEBS · ${total} PHOTOS · ${state.imageOrder.length} ORDER`;
 }
 
-// ──────────────────────────────────────
+// ════════════════════════════════════════════════════════
 // CELEBRITY MANAGEMENT
-// ──────────────────────────────────────
+// ════════════════════════════════════════════════════════
 let celebCounter = 0;
 
 function initCelebCounter() {
@@ -646,9 +835,8 @@ function renderCelebGrid() {
   const grid = document.getElementById('celeb-grid');
   grid.innerHTML = '';
   if (state.celebrities.length === 0) {
-    // Add 5 starter cards
     for (let i = 0; i < 5; i++) createCelebEntry();
-    saveState();
+    saveAllCelebsToDB();
   }
   state.celebrities.forEach((_, idx) => appendCelebCard(idx));
   updatePhotoCounts();
@@ -656,39 +844,44 @@ function renderCelebGrid() {
 
 function createCelebEntry() {
   celebCounter++;
-  state.celebrities.push({
-    id: 'C' + String(celebCounter).padStart(2, '0'),
-    name: '',
-    photos: [null, null, null, null, null]
-  });
+  const celeb = {
+    id:     'C' + String(celebCounter).padStart(2, '0'),
+    name:   '',
+    photos: [null, null, null, null, null],
+  };
+  state.celebrities.push(celeb);
+  return celeb;
 }
 
-function addCelebCard() {
+async function addCelebCard() {
   if (state.celebrities.length >= 20) {
     showToast('Maximum 20 celebrities allowed', 'error');
     return;
   }
-  createCelebEntry();
-  saveState();
+  const celeb = createCelebEntry();
+  const ok = await addCelebrity(celeb);
+  if (!ok) return;
   const idx = state.celebrities.length - 1;
   appendCelebCard(idx);
   updatePhotoCounts();
   refreshAdminStats();
+  showToast('Celebrity added to DB', 'success');
 }
 
 function appendCelebCard(idx) {
-  const grid = document.getElementById('celeb-grid');
+  const grid  = document.getElementById('celeb-grid');
   const celeb = state.celebrities[idx];
-  const card = document.createElement('div');
+  const card  = document.createElement('div');
   card.className = 'celeb-card';
   card.id = 'celeb-card-' + idx;
 
   const slots = (celeb.photos || [null,null,null,null,null]).map((photo, pi) => `
     <div class="photo-slot" onclick="triggerPhotoUpload(${idx},${pi})">
-      ${photo ? `<img src="${photo}" alt="P${pi+1}"><button class="remove-photo" onclick="removePhoto(event,${idx},${pi})">✕</button>` : '<span class="slot-icon">+</span>'}
+      ${photo
+        ? `<img src="${photo}" alt="P${pi+1}"><button class="remove-photo" onclick="removePhoto(event,${idx},${pi})">✕</button>`
+        : '<span class="slot-icon">+</span>'}
       <input type="file" accept="image/*" onchange="handlePhotoUpload(event,${idx},${pi})">
-    </div>
-  `).join('');
+    </div>`).join('');
 
   card.innerHTML = `
     <div class="celeb-row-header">
@@ -696,75 +889,70 @@ function appendCelebCard(idx) {
       <button class="btn btn-danger" style="padding:4px 10px;font-size:9px;letter-spacing:1px" onclick="removeCeleb(${idx})">Remove</button>
     </div>
     <div class="celeb-name-input">
-      <input type="text" value="${celeb.name || ''}" placeholder="Celebrity name..." onchange="updateCelebName(${idx},this.value)">
+      <input type="text" value="${celeb.name||''}" placeholder="Celebrity name…" onchange="updateCelebName(${idx},this.value)">
     </div>
     <div class="photo-slots">${slots}</div>
-    <div class="photo-count">Photos: <span id="photo-count-${idx}">${(celeb.photos||[]).filter(Boolean).length}</span> / 5</div>
-  `;
+    <div class="photo-count">Photos: <span id="photo-count-${idx}">${(celeb.photos||[]).filter(Boolean).length}</span> / 5</div>`;
   grid.appendChild(card);
 }
 
 function triggerPhotoUpload(ci, pi) {
   const card = document.getElementById('celeb-card-' + ci);
   if (!card) return;
-  const inputs = card.querySelectorAll('.photo-slot input[type="file"]');
-  if (inputs[pi]) inputs[pi].click();
+  card.querySelectorAll('.photo-slot input[type="file"]')[pi]?.click();
 }
 
-function handlePhotoUpload(event, ci, pi) {
+async function handlePhotoUpload(event, ci, pi) {
   const file = event.target.files[0];
   if (!file) return;
   const reader = new FileReader();
-  reader.onload = e => {
+  reader.onload = async e => {
     state.celebrities[ci].photos[pi] = e.target.result;
-    saveState();
-    rebuildCelebCard(ci);
-    updatePhotoCounts();
-    refreshAdminStats();
+    const ok = await updateCelebrity(state.celebrities[ci]);
+    if (ok) { rebuildCelebCard(ci); updatePhotoCounts(); refreshAdminStats(); showToast('Photo saved to DB', 'success'); }
   };
   reader.readAsDataURL(file);
 }
 
-function removePhoto(event, ci, pi) {
+async function removePhoto(event, ci, pi) {
   event.stopPropagation();
   state.celebrities[ci].photos[pi] = null;
-  saveState();
-  rebuildCelebCard(ci);
-  updatePhotoCounts();
+  const ok = await updateCelebrity(state.celebrities[ci]);
+  if (ok) { rebuildCelebCard(ci); updatePhotoCounts(); }
 }
 
-function removeCeleb(idx) {
-  if (!confirm('Remove this celebrity and all their photos?')) return;
+async function removeCeleb(idx) {
+  if (!confirm('Remove this celebrity from DB? This cannot be undone.')) return;
+  const celeb = state.celebrities[idx];
+  const ok = await deleteCelebrity(celeb.id);
+  if (!ok) return;
   state.celebrities.splice(idx, 1);
-  saveState();
-  // Re-render all
   const grid = document.getElementById('celeb-grid');
   grid.innerHTML = '';
   state.celebrities.forEach((_, i) => appendCelebCard(i));
   updatePhotoCounts();
   refreshAdminStats();
+  showToast('Celebrity removed', 'success');
 }
 
 function rebuildCelebCard(idx) {
-  const old = document.getElementById('celeb-card-' + idx);
-  const grid = document.getElementById('celeb-grid');
+  const old   = document.getElementById('celeb-card-' + idx);
+  const grid  = document.getElementById('celeb-grid');
   const cards = Array.from(grid.children);
-  const pos = cards.indexOf(old);
+  const pos   = cards.indexOf(old);
   if (old) old.remove();
-  // Temporarily append then move
   appendCelebCard(idx);
   const newCard = document.getElementById('celeb-card-' + idx);
-  if (pos >= 0 && pos < grid.children.length) {
-    grid.insertBefore(newCard, grid.children[pos]);
-  }
+  if (pos >= 0 && pos < grid.children.length) grid.insertBefore(newCard, grid.children[pos]);
 }
 
-function updateCelebName(idx, name) {
+async function updateCelebName(idx, name) {
   state.celebrities[idx].name = name;
-  saveState();
+  await updateCelebrity(state.celebrities[idx]);
 }
 
-function saveAllCelebs() {
+async function saveAllCelebs() {
+  // Flush name inputs
   state.celebrities.forEach((c, idx) => {
     const card = document.getElementById('celeb-card-' + idx);
     if (card) {
@@ -772,15 +960,19 @@ function saveAllCelebs() {
       if (input) c.name = input.value;
     }
   });
-  saveState();
+  await saveAllCelebsToDB();
   refreshAdminStats();
-  showToast('All celebrities saved', 'success');
+  showToast('All celebrities saved to DB', 'success');
+}
+
+async function saveAllCelebsToDB() {
+  for (const c of state.celebrities) await addCelebrity(c);
 }
 
 function updatePhotoCounts() {
   let total = 0;
   state.celebrities.forEach((c, idx) => {
-    const n = (c.photos || []).filter(Boolean).length;
+    const n = (c.photos||[]).filter(Boolean).length;
     total += n;
     const el = document.getElementById('photo-count-' + idx);
     if (el) el.textContent = n;
@@ -789,18 +981,17 @@ function updatePhotoCounts() {
     `${total} / ${state.celebrities.length * 5} photos uploaded`;
 }
 
-// ──────────────────────────────────────
+// ════════════════════════════════════════════════════════
 // SHUFFLE
-// ──────────────────────────────────────
-function generateShuffle() {
+// ════════════════════════════════════════════════════════
+async function generateShuffle() {
   const images = [];
   state.celebrities.forEach(c => {
-    (c.photos || []).forEach((photo, pi) => {
+    (c.photos||[]).forEach((photo, pi) => {
       if (photo) images.push({ celebId: c.id, photoIdx: pi, celebName: c.name, photo });
     });
   });
-
-  if (images.length === 0) { showToast('No photos uploaded yet', 'error'); return; }
+  if (!images.length) { showToast('No photos uploaded yet', 'error'); return; }
 
   // Fisher-Yates
   const arr = [...images];
@@ -809,22 +1000,18 @@ function generateShuffle() {
     [arr[i], arr[j]] = [arr[j], arr[i]];
   }
 
-  // Post-shuffle pass: break consecutive runs
-  let passes = 0;
-  let changed = true;
+  // Post-pass: break consecutive same-celeb
+  let passes = 0, changed = true;
   while (changed && passes < 500) {
-    changed = false;
-    passes++;
+    changed = false; passes++;
     for (let i = 0; i < arr.length - 1; i++) {
-      if (arr[i].celebId === arr[i + 1].celebId) {
-        // Find a swap target
+      if (arr[i].celebId === arr[i+1].celebId) {
         for (let j = i + 2; j < arr.length; j++) {
           if (arr[j].celebId !== arr[i].celebId &&
-              arr[j].celebId !== (arr[i + 2] || {}).celebId &&
-              (i === 0 || arr[j].celebId !== arr[i - 1].celebId)) {
-            [arr[i + 1], arr[j]] = [arr[j], arr[i + 1]];
-            changed = true;
-            break;
+              arr[j].celebId !== (arr[i+2]||{}).celebId &&
+              (i === 0 || arr[j].celebId !== arr[i-1].celebId)) {
+            [arr[i+1], arr[j]] = [arr[j], arr[i+1]];
+            changed = true; break;
           }
         }
       }
@@ -832,13 +1019,19 @@ function generateShuffle() {
   }
 
   state.imageOrder = arr;
-  saveState();
+  // Save to DB (strip photo data — store only metadata; photo comes from celebrities table)
+  const orderMeta = arr.map(({ photo, ...rest }) => rest); // omit base64
+  const ok = await saveConfig('image_order', orderMeta);
+  if (!ok) return;
+
+  // Reload so state.imageOrder has full photo data for UI
+  state.imageOrder = arr;
   renderShuffleStatus();
-  showToast(`Shuffled ${arr.length} images (${passes} passes)`, 'success');
+  showToast(`Shuffled ${arr.length} images (${passes} passes) · Saved to DB`, 'success');
 }
 
-function renderShuffleStatus() {
-  const statusEl = document.getElementById('shuffle-status');
+async function renderShuffleStatus() {
+  const statusEl  = document.getElementById('shuffle-status');
   const previewEl = document.getElementById('shuffle-preview');
   if (!state.imageOrder.length) {
     statusEl.textContent = 'No order generated yet.';
@@ -849,66 +1042,52 @@ function renderShuffleStatus() {
   for (let i = 1; i < state.imageOrder.length; i++) {
     if (state.imageOrder[i].celebId === state.imageOrder[i-1].celebId) {
       cur++; if (cur > maxRun) maxRun = cur;
-    } else {
-      if (cur > 1) runs++;
-      cur = 1;
-    }
+    } else { if (cur > 1) runs++; cur = 1; }
   }
-  statusEl.innerHTML = `✓ ${state.imageOrder.length} images ordered &nbsp;·&nbsp; Max consecutive same-celeb: <span style="color:${maxRun > 1 ? 'var(--red)' : 'var(--green)'}">${maxRun}</span> &nbsp;·&nbsp; Consecutive runs: ${runs}`;
+  statusEl.innerHTML = `✓ ${state.imageOrder.length} images · Max consecutive same-celeb: <span style="color:${maxRun>1?'var(--red)':'var(--green)'}">${maxRun}</span> · Runs: ${runs}`;
   previewEl.style.display = 'block';
   previewEl.innerHTML = state.imageOrder.slice(0, 40).map((img, i) =>
-    `<div class="shuffle-item"><span class="idx">#${i+1}</span><span class="cid">${img.celebId}</span><span style="color:var(--text-dim)">${img.celebName || 'Unnamed'} · Photo ${img.photoIdx+1}</span></div>`
-  ).join('') + (state.imageOrder.length > 40 ? `<div class="shuffle-item" style="color:var(--muted)">… and ${state.imageOrder.length - 40} more</div>` : '');
+    `<div class="shuffle-item"><span class="idx">#${i+1}</span><span class="cid">${img.celebId}</span><span style="color:var(--text-dim)">${img.celebName||'Unnamed'} · Photo ${img.photoIdx+1}</span></div>`
+  ).join('') + (state.imageOrder.length > 40 ? `<div class="shuffle-item" style="color:var(--muted)">… and ${state.imageOrder.length-40} more</div>` : '');
 }
 
-function clearShuffle() {
+async function clearShuffle() {
   state.imageOrder = [];
-  saveState();
+  await saveConfig('image_order', []);
   renderShuffleStatus();
-  showToast('Order cleared');
+  showToast('Order cleared from DB');
 }
 
-// ──────────────────────────────────────
-// IMPORT / EXPORT
-// ──────────────────────────────────────
-function exportDataset() {
-  const data = { celebrities: state.celebrities, imageOrder: state.imageOrder, settings: state.settings, exportedAt: new Date().toISOString() };
-  dlJSON(data, 'visage_dataset.json');
-  showToast('Dataset exported', 'success');
-}
-
-function importDataset(event) {
-  const file = event.target.files[0];
-  if (!file) return;
-  const reader = new FileReader();
-  reader.onload = e => {
-    try {
-      const data = JSON.parse(e.target.result);
-      if (data.celebrities) state.celebrities = data.celebrities;
-      if (data.imageOrder) state.imageOrder = data.imageOrder;
-      if (data.settings) state.settings = Object.assign({}, state.settings, data.settings);
-      saveState();
-      renderCelebGrid();
-      refreshAdminStats();
-      showToast('Dataset imported', 'success');
-    } catch(err) { showToast('Invalid JSON file', 'error'); }
+// ════════════════════════════════════════════════════════
+// EXPORT / IMPORT
+// ════════════════════════════════════════════════════════
+async function exportDataset() {
+  const allRatings = await loadAllRatings();
+  const data = {
+    celebrities:  state.celebrities,
+    imageOrder:   state.imageOrder,
+    settings:     state.settings,
+    ratings:      allRatings,
+    exportedAt:   new Date().toISOString(),
   };
-  reader.readAsText(file);
-  event.target.value = '';
+  dlJSON(data, 'visage_dataset.json');
+  showToast('Full dataset exported', 'success');
 }
 
-function exportCSV() {
+async function exportCSV() {
+  const ratings = await loadAllRatings();
   const rows = [['ParticipantID','ParticipantName','ImageIndex','CelebID','CelebName','PhotoIndex','Rating','Comment','Timestamp']];
-  Object.entries(state.participants || {}).forEach(([pid, p]) => {
-    (p.ratings || []).forEach(r => {
-      const img = state.imageOrder[r.imageIdx] || {};
-      rows.push([pid, p.name || pid, r.imageIdx, img.celebId || '', img.celebName || '', img.photoIdx ?? '', r.rating, (r.comment || '').replace(/"/g,'""'), r.ts || '']);
-    });
+  ratings.forEach(r => {
+    rows.push([
+      r.participant_id, r.participant_name, r.image_index,
+      r.celeb_id, r.celeb_name, r.photo_index,
+      r.rating, (r.comment||'').replace(/"/g,'""'), r.created_at,
+    ]);
   });
-  const csv = rows.map(r => r.map(v => `"${v}"`).join(',')).join('\n');
+  const csv  = rows.map(r => r.map(v => `"${v}"`).join(',')).join('\n');
   const blob = new Blob([csv], { type: 'text/csv' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
   a.href = url; a.download = 'visage_ratings.csv'; a.click();
   URL.revokeObjectURL(url);
   showToast('CSV exported', 'success');
@@ -916,55 +1095,64 @@ function exportCSV() {
 
 function dlJSON(data, filename) {
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
   a.href = url; a.download = filename; a.click();
   URL.revokeObjectURL(url);
 }
 
-function clearAllRatings() {
-  if (!confirm('Clear ALL participant ratings? Cannot be undone.')) return;
-  state.participants = {};
-  saveState();
-  showToast('All ratings cleared', 'success');
+async function clearAllRatings() {
+  if (!confirm('Delete ALL ratings from Supabase? Cannot be undone.')) return;
+  const { error } = await db.from('ratings').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+  if (error) { showToast('Error: ' + error.message, 'error'); return; }
+  showToast('All ratings cleared from DB', 'success');
 }
 
-function clearEverything() {
-  if (!confirm('Clear EVERYTHING — photos, order, ratings? Cannot be undone.')) return;
-  localStorage.removeItem(STORAGE_KEY);
-  state = defaultState();
+async function clearEverything() {
+  if (!confirm('Delete ALL data — celebrities, order, ratings — from Supabase? Cannot be undone.')) return;
+  await db.from('ratings').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+  await db.from('celebrities').delete().neq('id', '');
+  await db.from('study_config').delete().neq('key', '');
+  state.celebrities = [];
+  state.imageOrder  = [];
   renderCelebGrid();
   refreshAdminStats();
-  showToast('All data cleared', 'success');
+  showToast('All data cleared from DB', 'success');
 }
 
-// ──────────────────────────────────────
+// ════════════════════════════════════════════════════════
 // RESULTS VIEW
-// ──────────────────────────────────────
-function renderResults() {
+// ════════════════════════════════════════════════════════
+async function renderResults() {
   const el = document.getElementById('results-content');
+  el.innerHTML = '<p style="color:var(--text-dim);font-size:12px;margin-top:8px">Loading from Supabase…</p>';
+
   if (!state.imageOrder.length) {
-    el.innerHTML = '<p style="color:var(--text-dim);font-size:12px;margin-top:16px">No image order generated yet.</p>';
+    el.innerHTML = '<p style="color:var(--text-dim);font-size:12px;margin-top:8px">No image order generated yet.</p>';
     return;
   }
+
+  const allRatings = await loadAllRatings();
+
+  // Group by image_index
   const rMap = {};
-  Object.entries(state.participants || {}).forEach(([pid, p]) => {
-    (p.ratings || []).forEach(r => {
-      if (!rMap[r.imageIdx]) rMap[r.imageIdx] = [];
-      rMap[r.imageIdx].push({ name: p.name || pid, rating: r.rating, comment: r.comment });
-    });
+  allRatings.forEach(r => {
+    if (!rMap[r.image_index]) rMap[r.image_index] = [];
+    rMap[r.image_index].push(r);
   });
+
   const rows = state.imageOrder.map((img, idx) => {
     const list = rMap[idx] || [];
-    const avg = list.length ? (list.reduce((s, r) => s + r.rating, 0) / list.length).toFixed(1) : '—';
+    const avg  = list.length ? (list.reduce((s,r)=>s+r.rating,0)/list.length).toFixed(1) : '—';
     return `<tr style="cursor:pointer" onclick="showImageModal(${idx})">
       <td style="color:var(--text-dim)">#${idx+1}</td>
-      <td style="color:var(--white)">${img.celebName || img.celebId}</td>
-      <td>Photo ${(img.photoIdx ?? 0)+1}</td>
+      <td style="color:var(--white)">${img.celebName||img.celebId}</td>
+      <td>Photo ${(img.photoIdx??0)+1}</td>
       <td>${list.length}</td>
       <td><span class="rating-badge">${avg}</span></td>
     </tr>`;
   }).join('');
+
   el.innerHTML = `<table class="results-table">
     <thead><tr><th>#</th><th>Celebrity</th><th>Photo</th><th>Ratings</th><th>Avg</th></tr></thead>
     <tbody>${rows}</tbody>
@@ -972,167 +1160,219 @@ function renderResults() {
   <p style="margin-top:12px;font-size:10px;color:var(--text-dim)">↑ Click any row to view individual comments.</p>`;
 }
 
-function showImageModal(imgIdx) {
-  const img = state.imageOrder[imgIdx];
+async function showImageModal(imgIdx) {
+  const img   = state.imageOrder[imgIdx];
   if (!img) return;
   const celeb = state.celebrities.find(c => c.id === img.celebId);
-  const src = celeb?.photos?.[img.photoIdx] || '';
-  const ratings = [];
-  Object.entries(state.participants || {}).forEach(([pid, p]) => {
-    const r = (p.ratings || []).find(r => r.imageIdx === imgIdx);
-    if (r) ratings.push({ name: p.name || pid, rating: r.rating, comment: r.comment });
-  });
-  const avg = ratings.length ? (ratings.reduce((s, r) => s + r.rating, 0) / ratings.length).toFixed(1) : '—';
+  const src   = celeb?.photos?.[img.photoIdx] || '';
+
+  const { data: rList } = await db.from('ratings')
+    .select('participant_name, rating, comment')
+    .eq('image_index', imgIdx)
+    .order('created_at');
+
+  const ratings  = rList || [];
+  const avg      = ratings.length ? (ratings.reduce((s,r)=>s+r.rating,0)/ratings.length).toFixed(1) : '—';
   const comments = ratings.map(r => `
     <div class="comment-item">
-      <div class="comment-participant">${r.name} <span class="comment-rating">★ ${r.rating}/10</span></div>
-      <div class="comment-text">${r.comment || '<em style="opacity:0.5">No comment provided</em>'}</div>
+      <div class="comment-participant">${r.participant_name||'—'}
+        <span class="comment-rating">★ ${r.rating}/10</span>
+      </div>
+      <div class="comment-text">${r.comment||'<em style="opacity:0.5">No comment</em>'}</div>
     </div>`).join('');
+
   document.getElementById('modal-content').innerHTML = `
     <div style="overflow:hidden;margin-bottom:16px">
       ${src ? `<img src="${src}" class="modal-image" alt="">` : '<div style="width:200px;height:200px;background:var(--surface);float:left;margin:0 24px 16px 0;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:24px">◈</div>'}
       <div>
-        <div style="font-family:\'Playfair Display\',serif;font-size:22px;font-weight:700;color:var(--white);margin-bottom:4px">${img.celebName || img.celebId}</div>
+        <div style="font-family:\'Playfair Display\',serif;font-size:22px;font-weight:700;color:var(--white);margin-bottom:4px">${img.celebName||img.celebId}</div>
         <div style="font-size:11px;color:var(--text-dim);letter-spacing:1px;margin-bottom:16px">Photo ${(img.photoIdx??0)+1} &nbsp;·&nbsp; Image #${imgIdx+1}</div>
         <div style="font-family:\'Playfair Display\',serif;font-size:36px;font-weight:700;color:var(--gold)">${avg}</div>
         <div style="font-size:10px;color:var(--text-dim);letter-spacing:1px">Average · ${ratings.length} response${ratings.length!==1?'s':''}</div>
       </div>
     </div>
     <div class="divider"></div>
-    <div class="comment-list">${comments || '<p style="color:var(--text-dim);font-size:12px">No ratings yet.</p>'}</div>`;
+    <div class="comment-list">${comments||'<p style="color:var(--text-dim);font-size:12px">No ratings yet.</p>'}</div>`;
   document.getElementById('image-modal').classList.add('open');
 }
 
-function closeModal() {
-  document.getElementById('image-modal').classList.remove('open');
-}
-document.getElementById('image-modal').addEventListener('click', e => { if (e.target === document.getElementById('image-modal')) closeModal(); });
+function closeModal() { document.getElementById('image-modal').classList.remove('open'); }
+document.getElementById('image-modal').addEventListener('click', e => {
+  if (e.target === document.getElementById('image-modal')) closeModal();
+});
 
-// ──────────────────────────────────────
+// ════════════════════════════════════════════════════════
 // PARTICIPANTS VIEW
-// ──────────────────────────────────────
-function renderParticipants() {
-  const p = state.participants || {};
-  const ids = Object.keys(p);
+// ════════════════════════════════════════════════════════
+async function renderParticipants() {
+  const statsEl = document.getElementById('participants-stats');
+  const tableEl = document.getElementById('participants-table');
+  statsEl.innerHTML = '<div style="color:var(--text-dim);font-size:12px;grid-column:1/-1">Loading…</div>';
+
+  const allRatings = await loadAllRatings();
   const total = state.imageOrder.length || 100;
-  const completed = ids.filter(id => (p[id].ratings?.length || 0) >= total).length;
-  document.getElementById('participants-stats').innerHTML = `
+
+  // Group by participant
+  const pMap = {};
+  allRatings.forEach(r => {
+    if (!pMap[r.participant_id]) pMap[r.participant_id] = { name: r.participant_name, ratings: [] };
+    pMap[r.participant_id].ratings.push(r);
+  });
+
+  const ids       = Object.keys(pMap);
+  const completed = ids.filter(id => pMap[id].ratings.length >= total).length;
+
+  statsEl.innerHTML = `
     <div class="stat-card"><div class="stat-value">${ids.length}</div><div class="stat-label">Total Participants</div></div>
     <div class="stat-card"><div class="stat-value">${completed}</div><div class="stat-label">Completed</div></div>
     <div class="stat-card"><div class="stat-value">${ids.length - completed}</div><div class="stat-label">In Progress</div></div>
     <div class="stat-card"><div class="stat-value">${total}</div><div class="stat-label">Total Images</div></div>`;
+
   const rows = ids.map(id => {
-    const pp = p[id];
-    const done = pp.ratings?.length || 0;
-    const pct = total > 0 ? Math.round(done / total * 100) : 0;
+    const pp   = pMap[id];
+    const done = pp.ratings.length;
+    const pct  = total > 0 ? Math.round(done/total*100) : 0;
     const isComplete = done >= total;
-    const avg = done > 0 ? (pp.ratings.reduce((s, r) => s + r.rating, 0) / done).toFixed(1) : '—';
+    const avg  = done > 0 ? (pp.ratings.reduce((s,r)=>s+r.rating,0)/done).toFixed(1) : '—';
     return `<tr>
-      <td style="color:var(--white)">${pp.name || id}</td>
-      <td><div style="font-size:11px;margin-bottom:4px">${done} / ${total} (${pct}%)</div><div class="progress-fill-mini"><div class="progress-fill-mini-inner" style="width:${pct}%"></div></div></td>
-      <td><span style="color:${isComplete ? 'var(--green)' : 'var(--text-dim)'}">${isComplete ? '✓ Complete' : 'In Progress'}</span></td>
+      <td style="color:var(--white)">${pp.name||id}</td>
+      <td>
+        <div style="font-size:11px;margin-bottom:4px">${done} / ${total} (${pct}%)</div>
+        <div class="progress-fill-mini"><div class="progress-fill-mini-inner" style="width:${pct}%"></div></div>
+      </td>
+      <td><span style="color:${isComplete?'var(--green)':'var(--text-dim)'}">${isComplete?'✓ Complete':'In Progress'}</span></td>
       <td><span class="rating-badge">${avg}</span></td>
     </tr>`;
   }).join('');
-  document.getElementById('participants-table').innerHTML = rows ||
-    '<tr><td colspan="4" style="color:var(--text-dim);text-align:center;padding:24px">No participants yet</td></tr>';
+
+  tableEl.innerHTML = rows || '<tr><td colspan="4" style="color:var(--text-dim);text-align:center;padding:24px">No participants yet</td></tr>';
 }
 
-// ──────────────────────────────────────
+// ════════════════════════════════════════════════════════
+// CONNECTION TEST
+// ════════════════════════════════════════════════════════
+async function testConnection() {
+  const el = document.getElementById('conn-test-result');
+  el.textContent = 'Testing…';
+  el.style.color = 'var(--text-dim)';
+  try {
+    const { error } = await db.from('study_config').select('key').limit(1);
+    if (error) throw error;
+    el.textContent = '✓ Connection successful';
+    el.style.color = 'var(--green)';
+  } catch(e) {
+    el.textContent = '✗ ' + e.message;
+    el.style.color = 'var(--red)';
+  }
+}
+
+// ════════════════════════════════════════════════════════
 // SETTINGS
-// ──────────────────────────────────────
-function changePassword() {
+// ════════════════════════════════════════════════════════
+async function changePassword() {
   const pw = document.getElementById('settings-pw').value.trim();
   if (!pw) { showToast('Enter a new password', 'error'); return; }
   state.settings.adminPw = pw;
-  saveState();
+  await saveConfig('settings', state.settings);
   document.getElementById('settings-pw').value = '';
-  showToast('Password updated', 'success');
+  showToast('Password updated in DB', 'success');
 }
 
-function saveSettings() {
+async function saveSettings() {
   state.settings.title = document.getElementById('settings-title').value;
-  saveState();
-  showToast('Settings saved', 'success');
+  await saveConfig('settings', state.settings);
+  showToast('Settings saved to DB', 'success');
 }
 
-// ──────────────────────────────────────
+// ════════════════════════════════════════════════════════
 // PARTICIPANT LOGIN
-// ──────────────────────────────────────
-let currentParticipant = null;
-let sessionStart = null;
+// ════════════════════════════════════════════════════════
+let currentParticipant     = null;
+let currentParticipantName = null;
+let sessionStart           = null;
 
-function checkReturning() {
+async function checkReturning() {
   const raw = document.getElementById('participant-id-input').value.trim();
-  const id = raw.toLowerCase().replace(/\s+/g,'_');
+  const id  = raw.toLowerCase().replace(/\s+/g,'_');
   const msg = document.getElementById('returning-msg');
-  if (id && state.participants[id]) {
-    const pp = state.participants[id];
-    const done = pp.ratings?.length || 0;
-    const total = state.imageOrder.length || 100;
+  if (!id) { msg.style.display = 'none'; return; }
+
+  const { count } = await db.from('ratings')
+    .select('*', { count: 'exact', head: true })
+    .eq('participant_id', id);
+
+  const done  = count || 0;
+  const total = state.imageOrder.length || 100;
+  if (done > 0) {
     msg.style.display = 'block';
-    msg.innerHTML = `Returning: <strong>${pp.name || id}</strong> &nbsp;·&nbsp; ${done} / ${total} images completed`;
+    msg.innerHTML = `Returning participant &nbsp;·&nbsp; <strong>${done}</strong> / ${total} images completed`;
   } else {
     msg.style.display = 'none';
   }
 }
 
-function participantLogin() {
+async function participantLogin() {
   const raw = document.getElementById('participant-id-input').value.trim();
   if (!raw) { showToast('Please enter your name or ID', 'error'); return; }
   if (!state.imageOrder.length) { showToast('Study not ready — contact administrator', 'error'); return; }
-  const id = raw.toLowerCase().replace(/\s+/g,'_');
-  currentParticipant = id;
-  sessionStart = Date.now();
-  if (!state.participants[id]) {
-    state.participants[id] = { name: raw, ratings: [], startTs: new Date().toISOString() };
-  } else {
-    state.participants[id].name = raw;
-  }
-  saveState();
+
+  setLoading(true, 'Loading your progress…');
+  const id          = raw.toLowerCase().replace(/\s+/g,'_');
+  currentParticipant     = id;
+  currentParticipantName = raw;
+  sessionStart           = Date.now();
+
+  // Load existing ratings from DB to find resume point
+  participantRatingsCache = await loadParticipantRatings(id);
+  setLoading(false);
   initRatingScreen();
 }
 
-// ──────────────────────────────────────
+// ════════════════════════════════════════════════════════
 // RATING SCREEN
-// ──────────────────────────────────────
+// ════════════════════════════════════════════════════════
 let currentImageIdx = 0;
-let currentRating = 0;
+let currentRating   = 0;
 
 function initRatingScreen() {
-  const p = state.participants[currentParticipant];
-  currentImageIdx = p.ratings.length;
+  // The next unseen image = number of ratings already submitted
+  currentImageIdx = participantRatingsCache.length;
+
   if (currentImageIdx >= state.imageOrder.length) {
     showCompletionScreen();
     return;
   }
+
   showScreen('rating');
   document.getElementById('rating-participant-name').textContent =
-    (p.name || currentParticipant).toUpperCase();
-  // Build stars
+    (currentParticipantName || currentParticipant).toUpperCase();
+
+  // Build star buttons
   const sc = document.getElementById('stars-container');
   sc.innerHTML = '';
   for (let i = 1; i <= 10; i++) {
-    const s = document.createElement('button');
-    s.className = 'star';
+    const s      = document.createElement('button');
+    s.className  = 'star';
     s.textContent = i;
-    s.onclick = () => setRating(i);
+    s.onclick    = () => setRating(i);
     sc.appendChild(s);
   }
+
   currentRating = 0;
   loadImage(currentImageIdx);
 }
 
 function loadImage(idx) {
   currentRating = 0;
-  document.getElementById('rating-slider').value = 5;
+  document.getElementById('rating-slider').value       = 5;
   document.getElementById('rating-display').textContent = '—';
-  document.getElementById('commentary-input').value = '';
-  document.getElementById('char-count').textContent = '0';
+  document.getElementById('commentary-input').value    = '';
+  document.getElementById('char-count').textContent    = '0';
   document.querySelectorAll('.star').forEach(s => s.classList.remove('active'));
 
   const total = state.imageOrder.length;
-  const pct = (idx / total) * 100;
+  const pct   = (idx / total) * 100;
+
   document.getElementById('progress-text').textContent = `${idx} / ${total}`;
   document.getElementById('progress-fill').style.width = pct + '%';
   ['m25','m50','m75'].forEach((id, i) => {
@@ -1140,16 +1380,19 @@ function loadImage(idx) {
   });
   document.getElementById('image-counter-display').textContent = `${idx+1} / ${total}`;
 
-  const img = state.imageOrder[idx];
-  const celeb = state.celebrities.find(c => c.id === img.celebId);
-  const src = celeb?.photos?.[img.photoIdx] || null;
-  const display = document.getElementById('image-display');
+  // Resolve image source — from in-memory state (photos loaded on admin side)
+  // For participants, image_order was loaded from DB (metadata only), so we
+  // look up the photo from the celebrities cache.
+  const entry = state.imageOrder[idx];
+  const celeb = state.celebrities.find(c => c.id === entry.celebId);
+  const src   = celeb?.photos?.[entry.photoIdx] || entry.photo || null;
 
+  const display = document.getElementById('image-display');
   if (src) {
-    const newImg = new Image();
+    const newImg     = new Image();
     newImg.className = 'fading';
-    newImg.alt = img.celebName || '';
-    newImg.onload = () => {
+    newImg.alt       = entry.celebName || '';
+    newImg.onload    = () => {
       display.innerHTML = '';
       display.appendChild(newImg);
       requestAnimationFrame(() => newImg.classList.remove('fading'));
@@ -1163,7 +1406,7 @@ function loadImage(idx) {
 function setRating(val) {
   currentRating = val;
   document.getElementById('rating-display').textContent = val + ' / 10';
-  document.getElementById('rating-slider').value = val;
+  document.getElementById('rating-slider').value        = val;
   document.querySelectorAll('.star').forEach((s, i) => s.classList.toggle('active', i < val));
 }
 
@@ -1174,14 +1417,37 @@ function updateCharCount() {
     document.getElementById('commentary-input').value.length;
 }
 
-function submitRating() {
+async function submitRating() {
   if (!currentRating) { showToast('Please give a rating (1–10)', 'error'); return; }
   const comment = document.getElementById('commentary-input').value.trim();
-  if (!comment) { showToast('Please write a commentary', 'error'); return; }
-  const p = state.participants[currentParticipant];
-  p.ratings.push({ imageIdx: currentImageIdx, rating: currentRating, comment, ts: new Date().toISOString() });
-  saveState();
+  if (!comment)  { showToast('Please write a commentary', 'error'); return; }
+
+  // Disable button to prevent double-submit
+  const btn = document.getElementById('next-btn');
+  btn.disabled = true;
+
+  const img = state.imageOrder[currentImageIdx];
+
+  try {
+    await submitRatingToDB(
+      currentParticipant,
+      currentParticipantName,
+      currentImageIdx,
+      img,
+      currentRating,
+      comment
+    );
+  } catch(e) {
+    showToast('Error saving rating: ' + e.message, 'error');
+    btn.disabled = false;
+    return;
+  }
+
+  // Update local cache so resume index stays correct
+  participantRatingsCache.push({ image_index: currentImageIdx, rating: currentRating, comment });
+  btn.disabled = false;
   currentImageIdx++;
+
   if (currentImageIdx >= state.imageOrder.length) {
     showCompletionScreen();
   } else {
@@ -1189,32 +1455,71 @@ function submitRating() {
   }
 }
 
-function saveAndExit() {
-  saveState();
+async function saveAndExit() {
+  // Nothing to flush — each rating is saved immediately to Supabase
   showToast('Progress saved ✓', 'success');
   setTimeout(() => showScreen('landing'), 800);
 }
 
-// ──────────────────────────────────────
-// COMPLETION
-// ──────────────────────────────────────
+// ════════════════════════════════════════════════════════
+// COMPLETION SCREEN
+// ════════════════════════════════════════════════════════
 function showCompletionScreen() {
-  const p = state.participants[currentParticipant];
-  const ratings = p.ratings || [];
-  const avg = ratings.length ? (ratings.reduce((s,r) => s + r.rating, 0) / ratings.length).toFixed(1) : '—';
-  const elapsed = sessionStart ? Math.round((Date.now() - sessionStart) / 60000) : 0;
+  const ratings = participantRatingsCache;
+  const avg     = ratings.length
+    ? (ratings.reduce((s,r)=>s+r.rating,0)/ratings.length).toFixed(1)
+    : '—';
+  const elapsed = sessionStart ? Math.round((Date.now()-sessionStart)/60000) : 0;
   const timeStr = elapsed < 60 ? elapsed + ' min' : (elapsed/60).toFixed(1) + ' hr';
   document.getElementById('complete-count').textContent = ratings.length;
-  document.getElementById('complete-avg').textContent = avg;
-  document.getElementById('complete-time').textContent = timeStr;
+  document.getElementById('complete-avg').textContent   = avg;
+  document.getElementById('complete-time').textContent  = timeStr;
   showScreen('complete');
 }
-const supabaseUrl = 'https://wjufytpsvnvwqgsddstx.supabase.co';
-const supabaseKey = 'sb_publishable_rQk8ZpNMVP1WTUXOWKfu3w_ZcSfrehS';
 
-const supabase = supabase.createClient(supabaseUrl, supabaseKey);
+// ════════════════════════════════════════════════════════
+// PARTICIPANT-SIDE: load image order + celebrities on login
+// We need the photo data for the rating screen even for participants.
+// Solution: load celebrities from Supabase before entering rating screen.
+// This is already done in participantLogin → initRatingScreen chain,
+// but we also need to hydrate state.imageOrder with photo data.
+// ════════════════════════════════════════════════════════
+async function hydrateImageOrder() {
+  // state.imageOrder loaded from DB has {celebId, photoIdx, celebName}
+  // Merge photo data from celebrities cache
+  state.imageOrder = state.imageOrder.map(entry => {
+    const celeb = state.celebrities.find(c => c.id === entry.celebId);
+    return { ...entry, photo: celeb?.photos?.[entry.photoIdx] || null };
+  });
+}
 
-console.log("Supabase Engine is Ready!");
+// Override participantLogin to also load celebrities + hydrate order
+const _origParticipantLogin = participantLogin;
+async function participantLogin() {
+  const raw = document.getElementById('participant-id-input').value.trim();
+  if (!raw) { showToast('Please enter your name or ID', 'error'); return; }
+  if (!state.imageOrder.length) { showToast('Study not ready — contact administrator', 'error'); return; }
+
+  setLoading(true, 'Loading study data…');
+  const id = raw.toLowerCase().replace(/\s+/g,'_');
+  currentParticipant     = id;
+  currentParticipantName = raw;
+  sessionStart           = Date.now();
+
+  // Load celebrities (for photo data) and existing ratings in parallel
+  await Promise.all([
+    loadCelebrities(),
+    (async () => { participantRatingsCache = await loadParticipantRatings(id); })(),
+  ]);
+  await hydrateImageOrder();
+  setLoading(false);
+  initRatingScreen();
+}
+
+// ════════════════════════════════════════════════════════
+// BOOTSTRAP
+// ════════════════════════════════════════════════════════
+init();
 </script>
 </body>
 </html>
