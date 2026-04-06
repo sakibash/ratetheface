@@ -4,18 +4,27 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>VISAGE — Face Rating Study</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,400;1,700&family=JetBrains+Mono:wght@300;400;500&display=swap" rel="stylesheet">
 <style>
   :root {
-    --black: #080808; --deep: #0f0f0f; --surface: #161616;
-    --border: #2a2a2a; --muted: #3a3a3a; --text-dim: #888;
-    --text: #d4d4d4; --white: #f0ead6;
-    --gold: #c9a84c; --gold-light: #e2c77a; --gold-dim: #6b5520;
-    --red: #c0392b; --green: #27ae60;
+    --black: #080808;
+    --deep: #0f0f0f;
+    --surface: #161616;
+    --border: #2a2a2a;
+    --muted: #3a3a3a;
+    --text-dim: #888;
+    --text: #d4d4d4;
+    --white: #f0ead6;
+    --gold: #c9a84c;
+    --gold-light: #e2c77a;
+    --gold-dim: #6b5520;
+    --red: #c0392b;
+    --green: #27ae60;
   }
-  *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
   html, body { height: 100%; background: var(--black); color: var(--text); font-family: 'JetBrains Mono', monospace; font-size: 13px; line-height: 1.6; overflow-x: hidden; }
   body::before { content: ''; position: fixed; inset: 0; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E"); pointer-events: none; z-index: 9999; opacity: 0.4; }
   .screen { display: none; min-height: 100vh; animation: fadeIn 0.5s ease; }
@@ -23,6 +32,7 @@
   @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
   .app-header { display: flex; align-items: center; justify-content: space-between; padding: 20px 32px; border-bottom: 1px solid var(--border); background: var(--deep); position: sticky; top: 0; z-index: 100; }
   .logo { font-family: 'Playfair Display', serif; font-size: 22px; font-weight: 900; color: var(--gold); letter-spacing: 8px; text-transform: uppercase; }
+  .logo span { color: var(--white); }
   .header-meta { font-size: 11px; color: var(--text-dim); letter-spacing: 2px; text-transform: uppercase; }
   .btn { display: inline-flex; align-items: center; gap: 8px; padding: 12px 28px; border: 1px solid var(--gold-dim); background: transparent; color: var(--gold); font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 2px; text-transform: uppercase; cursor: pointer; transition: all 0.2s ease; outline: none; }
   .btn:hover { background: var(--gold); color: var(--black); border-color: var(--gold); }
@@ -33,31 +43,21 @@
   .btn.btn-danger { border-color: var(--red); color: var(--red); }
   .btn.btn-danger:hover { background: var(--red); color: #fff; }
   .btn:disabled { opacity: 0.4; cursor: not-allowed; pointer-events: none; }
-  input[type="text"], input[type="password"], textarea { width: 100%; background: var(--surface); border: 1px solid var(--border); color: var(--white); font-family: 'JetBrains Mono', monospace; font-size: 13px; padding: 12px 16px; outline: none; transition: border-color 0.2s; }
+  input[type="text"], input[type="password"], textarea, select { width: 100%; background: var(--surface); border: 1px solid var(--border); color: var(--white); font-family: 'JetBrains Mono', monospace; font-size: 13px; padding: 12px 16px; outline: none; transition: border-color 0.2s; }
   input[type="text"]:focus, input[type="password"]:focus, textarea:focus { border-color: var(--gold); }
   textarea { resize: vertical; min-height: 90px; }
   input::placeholder, textarea::placeholder { color: var(--muted); }
   label { display: block; font-size: 10px; letter-spacing: 2px; text-transform: uppercase; color: var(--text-dim); margin-bottom: 8px; }
   .field { margin-bottom: 20px; }
   .divider { height: 1px; background: linear-gradient(90deg, transparent, var(--gold-dim), transparent); margin: 32px 0; }
-
-  /* TOAST */
-  #toast { position: fixed; bottom: 32px; right: 32px; padding: 14px 24px; background: var(--surface); border: 1px solid var(--gold-dim); color: var(--gold); font-size: 12px; letter-spacing: 1px; z-index: 10000; transform: translateY(20px); opacity: 0; transition: all 0.3s ease; pointer-events: none; max-width: 340px; }
+  #toast { position: fixed; bottom: 32px; right: 32px; padding: 14px 24px; background: var(--surface); border: 1px solid var(--gold-dim); color: var(--gold); font-size: 12px; letter-spacing: 1px; z-index: 10000; transform: translateY(20px); opacity: 0; transition: all 0.3s ease; pointer-events: none; max-width: 320px; }
   #toast.show { transform: translateY(0); opacity: 1; }
   #toast.error { border-color: var(--red); color: #ff6b6b; }
   #toast.success { border-color: var(--green); color: #6bffaa; }
-
-  /* DB PILL */
-  .db-pill { display: inline-flex; align-items: center; gap: 8px; padding: 6px 14px; border: 1px solid var(--border); font-size: 11px; letter-spacing: 1px; color: var(--text-dim); margin-top: 24px; }
-  .db-pill .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); flex-shrink: 0; }
-  .db-pill.connected .dot { background: var(--green); box-shadow: 0 0 8px var(--green); }
-  .db-pill.error .dot { background: var(--red); }
-  .db-pill.connected { border-color: var(--green); color: var(--green); }
-  .db-pill.error { border-color: var(--red); color: var(--red); }
-
   ::-webkit-scrollbar { width: 4px; }
   ::-webkit-scrollbar-track { background: var(--deep); }
   ::-webkit-scrollbar-thumb { background: var(--muted); }
+  ::-webkit-scrollbar-thumb:hover { background: var(--gold-dim); }
 
   /* LANDING */
   #screen-landing { align-items: center; justify-content: center; text-align: center; position: relative; overflow: hidden; }
@@ -94,7 +94,7 @@
   .admin-panel { display: none; }
   .admin-panel.active { display: block; }
 
-  /* CELEB GRID */
+  /* Celeb Grid */
   .celeb-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; margin-top: 16px; }
   .celeb-card { background: var(--surface); border: 1px solid var(--border); padding: 16px; transition: border-color 0.2s; }
   .celeb-card:hover { border-color: var(--muted); }
@@ -105,38 +105,40 @@
   .photo-slot input[type="file"] { display: none; }
   .photo-slot img { width: 100%; height: 100%; object-fit: cover; }
   .photo-slot .slot-icon { font-size: 18px; color: var(--muted); }
-  .photo-slot .remove-photo { position: absolute; top: 2px; right: 2px; width: 18px; height: 18px; background: var(--red); border: none; color: #fff; font-size: 10px; cursor: pointer; display: none; align-items: center; justify-content: center; padding: 0; }
+  .photo-slot .remove-photo { position: absolute; top: 2px; right: 2px; width: 18px; height: 18px; background: var(--red); border: none; color: #fff; font-size: 10px; cursor: pointer; display: none; align-items: center; justify-content: center; line-height: 1; padding: 0; }
   .photo-slot:hover .remove-photo { display: flex; }
   .celeb-row-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
   .celeb-id-badge { font-size: 9px; letter-spacing: 2px; color: var(--gold-dim); text-transform: uppercase; }
   .photo-count { font-size: 10px; color: var(--text-dim); margin-top: 8px; letter-spacing: 1px; }
   .photo-count span { color: var(--gold); }
 
-  /* STATS / TABLE */
+  /* Stats */
   .stats-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 16px; margin-bottom: 32px; }
   .stat-card { background: var(--surface); border: 1px solid var(--border); padding: 20px; }
   .stat-value { font-family: 'Playfair Display', serif; font-size: 36px; font-weight: 700; color: var(--gold); line-height: 1; margin-bottom: 4px; }
   .stat-label { font-size: 10px; letter-spacing: 2px; text-transform: uppercase; color: var(--text-dim); }
+
+  /* Results Table */
   .results-table { width: 100%; border-collapse: collapse; margin-top: 16px; }
   .results-table th { text-align: left; font-size: 9px; letter-spacing: 2px; text-transform: uppercase; color: var(--gold-dim); padding: 10px 14px; border-bottom: 1px solid var(--border); }
   .results-table td { padding: 12px 14px; border-bottom: 1px solid var(--border); font-size: 12px; color: var(--text); vertical-align: middle; }
   .results-table tr:hover td { background: rgba(255,255,255,0.02); }
   .rating-badge { display: inline-block; padding: 3px 10px; background: rgba(201,168,76,0.1); border: 1px solid var(--gold-dim); color: var(--gold); font-size: 11px; }
   .progress-fill-mini { height: 3px; background: var(--border); border-radius: 2px; overflow: hidden; margin-top: 4px; }
-  .progress-fill-mini-inner { height: 100%; background: var(--gold); }
+  .progress-fill-mini-inner { height: 100%; background: var(--gold); transition: width 0.4s ease; }
 
-  /* SHUFFLE */
+  /* Shuffle */
   .shuffle-preview { background: var(--surface); border: 1px solid var(--border); padding: 16px; margin-top: 16px; font-size: 11px; color: var(--text-dim); max-height: 200px; overflow-y: auto; }
   .shuffle-item { padding: 4px 0; border-bottom: 1px solid var(--border); display: flex; gap: 12px; }
   .shuffle-item:last-child { border-bottom: none; }
   .shuffle-item .idx { color: var(--muted); width: 30px; flex-shrink: 0; }
   .shuffle-item .cid { color: var(--gold); }
 
-  /* MODAL */
+  /* Modal */
   .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.92); z-index: 1000; align-items: center; justify-content: center; padding: 32px; }
   .modal-overlay.open { display: flex; animation: fadeIn 0.2s ease; }
   .modal-box { background: var(--deep); border: 1px solid var(--border); max-width: 900px; width: 100%; max-height: 90vh; overflow-y: auto; padding: 32px; position: relative; }
-  .modal-close { position: absolute; top: 16px; right: 16px; background: none; border: none; color: var(--text-dim); font-size: 20px; cursor: pointer; }
+  .modal-close { position: absolute; top: 16px; right: 16px; background: none; border: none; color: var(--text-dim); font-size: 20px; cursor: pointer; line-height: 1; }
   .modal-close:hover { color: var(--white); }
   .modal-image { width: 200px; height: 200px; object-fit: cover; border: 1px solid var(--border); float: left; margin: 0 24px 16px 0; }
   .comment-list { margin-top: 16px; }
@@ -145,10 +147,11 @@
   .comment-rating { float: right; color: var(--gold); font-size: 12px; }
   .comment-text { color: var(--text-dim); font-size: 12px; }
 
-  /* PARTICIPANT LOGIN */
+  /* Login / Participant */
   #screen-login { align-items: center; justify-content: center; position: relative; overflow: hidden; }
+  #screen-login::after { content: ''; position: absolute; width: 500px; height: 500px; border-radius: 50%; background: radial-gradient(circle, rgba(201,168,76,0.04) 0%, transparent 70%); top: 50%; left: 50%; transform: translate(-50%, -50%); pointer-events: none; }
 
-  /* RATING SCREEN */
+  /* Rating Screen */
   #screen-rating { flex-direction: column; min-height: 100vh; }
   .rating-layout { display: grid; grid-template-columns: 1fr 420px; flex: 1; min-height: 0; height: calc(100vh - 65px); }
   .image-panel { position: relative; background: #000; overflow: hidden; display: flex; align-items: center; justify-content: center; }
@@ -164,7 +167,7 @@
   .eval-body { padding: 28px 32px; flex: 1; }
   .progress-section { margin-bottom: 28px; }
   .progress-label { display: flex; justify-content: space-between; font-size: 10px; letter-spacing: 1.5px; color: var(--text-dim); text-transform: uppercase; margin-bottom: 8px; }
-  .progress-track { height: 2px; background: var(--muted); }
+  .progress-track { height: 2px; background: var(--muted); position: relative; }
   .progress-fill { height: 100%; background: linear-gradient(90deg, var(--gold-dim), var(--gold)); transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1); }
   .progress-milestones { display: flex; justify-content: space-between; margin-top: 6px; }
   .milestone { width: 4px; height: 4px; background: var(--muted); border-radius: 50%; }
@@ -176,7 +179,7 @@
   .star { width: 30px; height: 30px; background: none; border: 1px solid var(--muted); color: var(--muted); font-size: 11px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.15s; font-family: 'JetBrains Mono', monospace; }
   .star:hover, .star.active { background: var(--gold); border-color: var(--gold); color: var(--black); }
   .rating-slider { -webkit-appearance: none; appearance: none; width: 100%; height: 2px; background: var(--muted); outline: none; margin: 12px 0; cursor: pointer; }
-  .rating-slider::-webkit-slider-thumb { -webkit-appearance: none; width: 20px; height: 20px; background: var(--gold); cursor: pointer; border-radius: 0; border: 2px solid var(--black); box-shadow: 0 0 0 1px var(--gold); }
+  .rating-slider::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 20px; height: 20px; background: var(--gold); cursor: pointer; border-radius: 0; border: 2px solid var(--black); box-shadow: 0 0 0 1px var(--gold); }
   .rating-slider::-moz-range-thumb { width: 20px; height: 20px; background: var(--gold); cursor: pointer; border-radius: 0; border: 2px solid var(--black); }
   .slider-ticks { display: flex; justify-content: space-between; font-size: 9px; color: var(--muted); letter-spacing: 1px; margin-top: 4px; }
   .commentary-section { margin-bottom: 28px; }
@@ -187,7 +190,7 @@
   .image-placeholder .big-icon { font-size: 48px; opacity: 0.3; }
   .image-placeholder p { font-size: 11px; letter-spacing: 1px; }
 
-  /* COMPLETE */
+  /* Complete Screen */
   #screen-complete { align-items: center; justify-content: center; text-align: center; position: relative; overflow: hidden; }
   .complete-content { position: relative; z-index: 1; max-width: 520px; padding: 40px; }
   .complete-icon { font-size: 48px; margin-bottom: 24px; display: block; }
@@ -200,6 +203,7 @@
   .complete-stat-lbl { font-size: 9px; letter-spacing: 1.5px; text-transform: uppercase; color: var(--text-dim); margin-top: 4px; }
   .json-actions { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 8px; }
 
+  /* Responsive */
   @media (max-width: 900px) {
     .rating-layout { grid-template-columns: 1fr; grid-template-rows: 45vh 1fr; height: auto; }
     .image-panel { height: 45vh; }
@@ -222,7 +226,9 @@
 
 <div id="toast"></div>
 
-<!-- ═══ LANDING ═══ -->
+<!-- ═══════════════════════════════
+     LANDING
+═══════════════════════════════ -->
 <div id="screen-landing" class="screen active">
   <div class="decor-lines"></div>
   <div class="landing-content">
@@ -232,16 +238,15 @@
       <button class="btn btn-primary" onclick="goToParticipantLogin()">▶ &nbsp;Begin as Participant</button>
       <button class="btn" onclick="showAdminLogin()">⚙ &nbsp;Admin Panel</button>
     </div>
-    <div style="display:flex;justify-content:center">
-      <div class="db-pill" id="db-status-pill">
-        <div class="dot"></div>
-        <span id="db-status-label">Connecting to Database…</span>
-      </div>
-    </div>
+    <p style="margin-top:32px;font-size:10px;color:var(--muted);letter-spacing:1px">
+      Powered by VISAGE Research Platform
+    </p>
   </div>
 </div>
 
-<!-- ═══ ADMIN LOGIN ═══ -->
+<!-- ═══════════════════════════════
+     ADMIN LOGIN
+═══════════════════════════════ -->
 <div id="screen-admin-login" class="screen">
   <div class="login-box">
     <div class="login-header">
@@ -256,11 +261,15 @@
     <div style="margin-top:16px;text-align:center">
       <button class="btn btn-ghost" onclick="showScreen('landing')" style="font-size:10px;padding:8px 16px">← Back</button>
     </div>
-    <p style="font-size:10px;color:var(--text-dim);margin-top:20px;text-align:center;line-height:1.8">Default password: <span style="color:var(--gold)">admin123</span></p>
+    <p style="font-size:10px;color:var(--text-dim);margin-top:20px;text-align:center;line-height:1.8">
+      Default password: <span style="color:var(--gold)">admin123</span>
+    </p>
   </div>
 </div>
 
-<!-- ═══ ADMIN PANEL ═══ -->
+<!-- ═══════════════════════════════
+     ADMIN PANEL
+═══════════════════════════════ -->
 <div id="screen-admin" class="screen">
   <div class="app-header">
     <span class="logo">VISAGE <span style="font-weight:400;font-size:14px;letter-spacing:3px;color:var(--text-dim)">/ ADMIN</span></span>
@@ -283,9 +292,10 @@
     </div>
     <div class="admin-main">
 
+      <!-- Upload -->
       <div id="panel-upload" class="admin-panel active">
         <div class="panel-title">Celebrity Photos</div>
-        <p class="panel-desc">Add up to 20 celebrities × 5 photos each = 100 images.</p>
+        <p class="panel-desc">Add up to 20 celebrities × 5 photos each = 100 images. Enter each name and upload their photos.</p>
         <div style="display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap;align-items:center">
           <button class="btn btn-primary" onclick="addCelebCard()">+ Add Celebrity</button>
           <button class="btn" onclick="saveAllCelebs()">Save All</button>
@@ -294,9 +304,10 @@
         <div class="celeb-grid" id="celeb-grid"></div>
       </div>
 
+      <!-- Shuffle -->
       <div id="panel-shuffle" class="admin-panel">
         <div class="panel-title">Generate Randomized Order</div>
-        <p class="panel-desc">Fisher-Yates shuffle ensuring no consecutive same-celebrity images.</p>
+        <p class="panel-desc">Smart shuffle with Fisher-Yates algorithm ensuring no consecutive same-celebrity images appear back-to-back.</p>
         <div style="display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap">
           <button class="btn btn-primary" onclick="generateShuffle()">Generate Shuffle</button>
           <button class="btn btn-ghost" onclick="clearShuffle()">Clear Order</button>
@@ -305,15 +316,29 @@
         <div class="shuffle-preview" id="shuffle-preview" style="display:none"></div>
       </div>
 
+      <!-- Data -->
       <div id="panel-data" class="admin-panel">
         <div class="panel-title">Data &amp; Export</div>
-        <p class="panel-desc">Export ratings as CSV. All data synced to Supabase.</p>
+        <p class="panel-desc">Import/export the full dataset as JSON. Export ratings as CSV.</p>
         <div class="divider"></div>
-        <div class="field"><label>Export Ratings</label>
-          <div class="json-actions"><button class="btn btn-primary" onclick="exportCSV()">Export All Ratings CSV</button></div>
+        <div class="field">
+          <label>Import Dataset (JSON)</label>
+          <input type="file" id="import-json-file" accept=".json" style="display:none" onchange="importDataset(event)">
+          <div class="json-actions">
+            <button class="btn" onclick="document.getElementById('import-json-file').click()">Import JSON</button>
+            <button class="btn btn-primary" onclick="exportDataset()">Export Dataset JSON</button>
+          </div>
         </div>
         <div class="divider"></div>
-        <div class="field"><label>Danger Zone</label>
+        <div class="field">
+          <label>Export Ratings</label>
+          <div class="json-actions">
+            <button class="btn btn-primary" onclick="exportCSV()">Export All Ratings CSV</button>
+          </div>
+        </div>
+        <div class="divider"></div>
+        <div class="field">
+          <label>Danger Zone</label>
           <div class="json-actions">
             <button class="btn btn-danger" onclick="clearAllRatings()">Clear All Ratings</button>
             <button class="btn btn-danger" onclick="clearEverything()">Clear Everything</button>
@@ -321,47 +346,64 @@
         </div>
       </div>
 
+      <!-- Results -->
       <div id="panel-results" class="admin-panel">
         <div class="panel-title">All Ratings</div>
-        <p class="panel-desc">Click any row to view participant comments.</p>
+        <p class="panel-desc">Click any row to view all participant comments for that image.</p>
         <div id="results-content"></div>
       </div>
 
+      <!-- Participants -->
       <div id="panel-participants" class="admin-panel">
         <div class="panel-title">Participants</div>
         <p class="panel-desc">Track progress and completion status.</p>
         <div class="stats-grid" id="participants-stats"></div>
         <table class="results-table">
-          <thead><tr><th>Name / ID</th><th>Progress</th><th>Status</th><th>Avg Rating</th></tr></thead>
+          <thead>
+            <tr><th>Name / ID</th><th>Progress</th><th>Status</th><th>Avg Rating</th></tr>
+          </thead>
           <tbody id="participants-table"></tbody>
         </table>
       </div>
 
+      <!-- Settings -->
       <div id="panel-settings" class="admin-panel">
         <div class="panel-title">Configuration</div>
-        <p class="panel-desc">Settings saved to Supabase.</p>
-        <div class="field"><label>Admin Password</label><input type="password" id="settings-pw" placeholder="New admin password"></div>
+        <p class="panel-desc">Study settings and admin password.</p>
+        <div class="field">
+          <label>Admin Password</label>
+          <input type="password" id="settings-pw" placeholder="New admin password">
+        </div>
         <button class="btn" onclick="changePassword()">Update Password</button>
         <div class="divider"></div>
-        <div class="field"><label>Study Title</label><input type="text" id="settings-title" placeholder="e.g. Visual Perception Study 2025"></div>
+        <div class="field">
+          <label>Study Title</label>
+          <input type="text" id="settings-title" placeholder="e.g. Visual Perception Study 2025">
+        </div>
         <button class="btn" onclick="saveSettings()">Save Settings</button>
       </div>
+
     </div>
   </div>
 </div>
 
-<!-- ═══ PARTICIPANT LOGIN ═══ -->
+<!-- ═══════════════════════════════
+     PARTICIPANT LOGIN
+═══════════════════════════════ -->
 <div id="screen-login" class="screen">
-  <div class="app-header"><span class="logo">VISAGE</span><span class="header-meta">Participant Entry</span></div>
+  <div class="app-header">
+    <span class="logo">VISAGE</span>
+    <span class="header-meta">Participant Entry</span>
+  </div>
   <div style="flex:1;display:flex;align-items:center;justify-content:center;padding:40px">
     <div class="login-box">
       <div class="login-header">
         <span class="logo" style="font-size:16px;letter-spacing:8px">VISAGE</span>
-        <p style="margin-top:8px">Enter your name or unique ID to begin</p>
+        <p style="margin-top:8px">Enter your name or unique ID to begin the study</p>
       </div>
       <div class="field">
         <label>Your Name / Participant ID</label>
-        <input type="text" id="participant-id-input" placeholder="e.g. Rahim, Participant_07…" oninput="checkReturning()" onkeydown="if(event.key==='Enter')participantLogin()">
+        <input type="text" id="participant-id-input" placeholder="e.g. Rahim, Participant_07..." onkeydown="if(event.key==='Enter')participantLogin()" oninput="checkReturning()">
       </div>
       <div class="returning-participant" id="returning-msg"></div>
       <button class="btn btn-primary" style="width:100%;justify-content:center;margin-top:16px" onclick="participantLogin()">Begin Study →</button>
@@ -372,7 +414,9 @@
   </div>
 </div>
 
-<!-- ═══ RATING ═══ -->
+<!-- ═══════════════════════════════
+     RATING
+═══════════════════════════════ -->
 <div id="screen-rating" class="screen">
   <div class="app-header">
     <span class="logo">VISAGE</span>
@@ -385,42 +429,65 @@
     <div class="image-panel">
       <div class="image-corner-decorator"></div>
       <div class="image-corner-bl"></div>
-      <div id="image-display"><div class="image-placeholder"><div class="big-icon">◈</div><p>Loading…</p></div></div>
+      <div id="image-display">
+        <div class="image-placeholder">
+          <div class="big-icon">◈</div>
+          <p>Loading...</p>
+        </div>
+      </div>
       <div class="image-counter" id="image-counter-display">— / —</div>
     </div>
     <div class="eval-panel">
-      <div class="eval-header"><div class="eval-title">Evaluate</div><div class="eval-subtitle">Observe · Reflect · Rate</div></div>
+      <div class="eval-header">
+        <div class="eval-title">Evaluate</div>
+        <div class="eval-subtitle">Observe · Reflect · Rate</div>
+      </div>
       <div class="eval-body">
         <div class="progress-section">
-          <div class="progress-label"><span>Progress</span><span id="progress-text">0 / 100</span></div>
-          <div class="progress-track"><div class="progress-fill" id="progress-fill" style="width:0%"></div></div>
+          <div class="progress-label">
+            <span>Progress</span>
+            <span id="progress-text">0 / 100</span>
+          </div>
+          <div class="progress-track">
+            <div class="progress-fill" id="progress-fill" style="width:0%"></div>
+          </div>
           <div class="progress-milestones">
-            <div class="milestone" id="m25"></div>
-            <div class="milestone" id="m50"></div>
-            <div class="milestone" id="m75"></div>
+            <div class="milestone" id="m25" title="25%"></div>
+            <div class="milestone" id="m50" title="50%"></div>
+            <div class="milestone" id="m75" title="75%"></div>
           </div>
         </div>
         <div class="rating-section">
-          <div class="rating-label"><span>Rating (1–10)</span><span class="rating-value-display" id="rating-display">—</span></div>
+          <div class="rating-label">
+            <span>Rating (1–10)</span>
+            <span class="rating-value-display" id="rating-display">—</span>
+          </div>
           <div class="stars" id="stars-container"></div>
           <input type="range" class="rating-slider" id="rating-slider" min="1" max="10" value="5" oninput="updateRatingFromSlider(this.value)">
-          <div class="slider-ticks"><span>1</span><span>2</span><span>3</span><span>4</span><span>5</span><span>6</span><span>7</span><span>8</span><span>9</span><span>10</span></div>
+          <div class="slider-ticks">
+            <span>1</span><span>2</span><span>3</span><span>4</span><span>5</span>
+            <span>6</span><span>7</span><span>8</span><span>9</span><span>10</span>
+          </div>
         </div>
         <div class="commentary-section">
           <label>Commentary</label>
-          <textarea id="commentary-input" placeholder="Share your thoughts. What do you notice? What impression does this image leave?" oninput="updateCharCount()"></textarea>
+          <textarea id="commentary-input" placeholder="Share your thoughts on this image. What do you notice? What impression does it leave?" oninput="updateCharCount()"></textarea>
           <div class="char-count"><span id="char-count">0</span> characters</div>
         </div>
       </div>
       <div class="eval-footer">
         <button class="btn btn-primary next-btn" id="next-btn" onclick="submitRating()">Next Image →</button>
-        <div style="margin-top:10px;text-align:center;font-size:10px;color:var(--muted);letter-spacing:1px">Rating &amp; commentary required</div>
+        <div style="margin-top:10px;text-align:center;font-size:10px;color:var(--muted);letter-spacing:1px">
+          Rating &amp; commentary required to proceed
+        </div>
       </div>
     </div>
   </div>
 </div>
 
-<!-- ═══ COMPLETE ═══ -->
+<!-- ═══════════════════════════════
+     COMPLETE
+═══════════════════════════════ -->
 <div id="screen-complete" class="screen">
   <div class="decor-lines"></div>
   <div class="complete-content">
@@ -428,16 +495,27 @@
     <h1 class="complete-title">Study<br><em>Complete</em></h1>
     <p class="complete-subtitle">Thank you for your participation</p>
     <div class="complete-stats">
-      <div class="complete-stat"><div class="complete-stat-val" id="complete-count">—</div><div class="complete-stat-lbl">Images Rated</div></div>
-      <div class="complete-stat"><div class="complete-stat-val" id="complete-avg">—</div><div class="complete-stat-lbl">Avg Rating</div></div>
-      <div class="complete-stat"><div class="complete-stat-val" id="complete-time">—</div><div class="complete-stat-lbl">Time Spent</div></div>
+      <div class="complete-stat">
+        <div class="complete-stat-val" id="complete-count">100</div>
+        <div class="complete-stat-lbl">Images Rated</div>
+      </div>
+      <div class="complete-stat">
+        <div class="complete-stat-val" id="complete-avg">—</div>
+        <div class="complete-stat-lbl">Avg Rating</div>
+      </div>
+      <div class="complete-stat">
+        <div class="complete-stat-val" id="complete-time">—</div>
+        <div class="complete-stat-lbl">Time Spent</div>
+      </div>
     </div>
-    <p style="font-size:12px;color:var(--text-dim);margin-bottom:32px;line-height:1.8">Your responses have been saved to our research database.</p>
+    <p style="font-size:12px;color:var(--text-dim);margin-bottom:32px;line-height:1.8">
+      Your responses have been saved. They will contribute to research on visual perception and facial aesthetics.
+    </p>
     <button class="btn btn-primary" onclick="showScreen('landing')">← Return to Home</button>
   </div>
 </div>
 
-<!-- MODAL -->
+<!-- Modal -->
 <div class="modal-overlay" id="image-modal">
   <div class="modal-box">
     <button class="modal-close" onclick="closeModal()">✕</button>
@@ -446,45 +524,9 @@
 </div>
 
 <script>
-/* ═══════════════════════════════════════════════════════
-   SUPABASE CONFIG — Plain fetch() REST API
-   No JS library = no DataCloneError, works everywhere
-═══════════════════════════════════════════════════════ */
-const SUPABASE_URL = 'https://wjufytpsvnvwqgsddstx.supabase.co';  // ✓ correct URL
-const SUPABASE_KEY = 'sb_publishable_rQk8ZpNMVP1WTUXOWKfu3w_ZcSfrehS';
-
-// Core fetch wrapper for Supabase REST API
-async function sbFetch(method, table, { filter = '', body = null, select = '*', upsert = false } = {}) {
-  const url = `${SUPABASE_URL}/rest/v1/${table}?select=${select}${filter ? '&' + filter : ''}`;
-  const headers = {
-    'apikey': SUPABASE_KEY,
-    'Authorization': 'Bearer ' + SUPABASE_KEY,
-    'Content-Type': 'application/json',
-    'Accept': 'application/json',
-  };
-  if (upsert) headers['Prefer'] = 'resolution=merge-duplicates,return=minimal';
-  else if (method === 'POST') headers['Prefer'] = 'return=minimal';
-
-  const res = await fetch(url, { method, headers, body: body ? JSON.stringify(body) : undefined });
-  if (!res.ok) {
-    const txt = await res.text();
-    throw new Error(`[${table} ${method} ${res.status}] ${txt}`);
-  }
-  const text = await res.text();
-  return text ? JSON.parse(text) : [];
-}
-
-// Convenience helpers
-const sb = {
-  select: (t, q)    => sbFetch('GET',    t, { filter: q }),
-  insert: (t, row)  => sbFetch('POST',   t, { body: row }),
-  upsert: (t, rows) => sbFetch('POST',   t, { body: rows, upsert: true }),
-  delete: (t, q)    => sbFetch('DELETE', t, { filter: q }),
-};
-
-/* ═══════════════════════════════════════════════════════
-   STATE — localStorage as instant cache, Supabase as source of truth
-═══════════════════════════════════════════════════════ */
+// ──────────────────────────────────────
+// STATE
+// ──────────────────────────────────────
 const STORAGE_KEY = 'visage_v2';
 
 function defaultState() {
@@ -496,131 +538,97 @@ function defaultState() {
   };
 }
 
-// Load from localStorage immediately (instant UI)
-let state = (() => {
-  try { const r = localStorage.getItem(STORAGE_KEY); return r ? JSON.parse(r) : defaultState(); }
-  catch(e) { return defaultState(); }
-})();
-if (!state.settings)     state.settings = { adminPw: 'admin123', title: 'Visual Perception Study' };
-if (!state.celebrities)  state.celebrities = [];
-if (!state.imageOrder)   state.imageOrder = [];
+async function loadStateFromSupabase() {
+    setLoading(true, 'Fetching data from cloud...');
+    try {
+        // ১. সেলিব্রিটি ডাটা আনা
+        const { data: celebs, error: celebErr } = await db.from('celebrities').select('*');
+        if (celebErr) throw celebErr;
+
+        // ২. কনফিগ এবং ইমেজ অর্ডার আনা
+        const { data: configs, error: configErr } = await db.from('study_config').select('*');
+        if (configErr) throw configErr;
+
+        if (celebs) state.celebrities = celebs;
+        
+        // ইমেজ অর্ডার এবং সেটিংস সেট করা
+        configs.forEach(cfg => {
+            if (cfg.key === 'main_settings') state.settings = cfg.value;
+            if (cfg.key === 'image_order') state.imageOrder = cfg.value;
+        });
+
+        console.log("Cloud data loaded successfully!");
+        renderAdminCelebrities(); // অ্যাডমিন প্যানেল আপডেট করা
+    } catch (err) {
+        console.error("Load Error:", err.message);
+    } finally {
+        setLoading(false);
+    }
+}
+
+// নতুন এবং উন্নত saveState যা Supabase-এ ডাটা পাঠাবে
+async function saveState() {
+  // ১. ব্রাউজারে আগের মতোই সেভ করে রাখা (ব্যাকআপ হিসেবে)
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  } catch(e) {
+    console.warn('LocalStorage full, but trying to sync with Database...');
+  }
+
+  // ২. Supabase ডাটাবেজে ডাটা পাঠানো
+  try {
+    // সেলিব্রিটিদের ডাটা সেভ (যদি থাকে)
+    if (state.celebrities && state.celebrities.length > 0) {
+      const { error: celebError } = await db.from('celebrities').upsert(
+        state.celebrities.map(c => ({
+          id: c.id,
+          name: c.name,
+          photos: c.photos 
+        }))
+      );
+      if (celebError) throw celebError;
+    }
+
+    // স্টাডি সেটিংস এবং সিরিয়াল সেভ
+    if (state.settings || state.imageOrder) {
+      const { error: configError } = await db.from('study_config').upsert([
+        { key: 'main_settings', value: state.settings },
+        { key: 'image_order', value: state.imageOrder }
+      ]);
+      if (configError) throw configError;
+    }
+
+    console.log("Supabase Sync: Success ✓");
+    showToast('Synced to Cloud ✓', 'success');
+  } catch (err) {
+    console.error("Supabase Sync Failed:", err.message);
+    // যদি ডাটাবেজ টেবিল না থাকে বা নেট না থাকে তবে এখানে এরর দেখাবে
+  }
+}
+
+// এই লাইনটি আগের মতোই থাকবে
+let state = loadState();
+// Repair state
+if (!state.settings) state.settings = { adminPw: 'admin123', title: 'Visual Perception Study' };
+if (!state.celebrities) state.celebrities = [];
+if (!state.imageOrder) state.imageOrder = [];
 if (!state.participants) state.participants = {};
 
-// Save to localStorage
-function saveLocal() {
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch(e) {}
-}
-
-/* ═══════════════════════════════════════════════════════
-   DB FUNCTIONS
-═══════════════════════════════════════════════════════ */
-async function loadStateFromSupabase() {
-  // Load celebrities
-  const celebs = await sb.select('celebrities', 'order=id');
-  if (Array.isArray(celebs) && celebs.length > 0) {
-    state.celebrities = celebs.map(r => ({
-      id: r.id, name: r.name || '',
-      photos: Array.isArray(r.photos) ? r.photos : [null,null,null,null,null]
-    }));
-  }
-
-  // Load config (settings + image_order)
-  const configs = await sb.select('study_config');
-  if (Array.isArray(configs)) {
-    configs.forEach(cfg => {
-      if (cfg.key === 'main_settings' && cfg.value) Object.assign(state.settings, cfg.value);
-      if (cfg.key === 'image_order'   && cfg.value) state.imageOrder = cfg.value;
-    });
-  }
-
-  // Load ratings (grouped by participant)
-  const ratings = await sb.select('ratings', 'order=created_at');
-  if (Array.isArray(ratings)) {
-    state.participants = {};
-    ratings.forEach(r => {
-      if (!state.participants[r.participant_id]) {
-        state.participants[r.participant_id] = { name: r.participant_name || r.participant_id, ratings: [] };
-      }
-      state.participants[r.participant_id].ratings.push({
-        imageIdx: r.image_index, rating: r.rating, comment: r.comment, ts: r.created_at
-      });
-    });
-  }
-
-  saveLocal();
-}
-
-async function saveState() {
-  saveLocal(); // instant local save
-
-  // Sync celebrities to Supabase
-  if (state.celebrities && state.celebrities.length > 0) {
-    await sb.upsert('celebrities', state.celebrities.map(c => ({
-      id: c.id, name: c.name || '', photos: c.photos || []
-    })));
-  }
-
-  // Sync settings and image order
-  await sb.upsert('study_config', [
-    { key: 'main_settings', value: state.settings, updated_at: new Date().toISOString() },
-    { key: 'image_order',   value: state.imageOrder, updated_at: new Date().toISOString() }
-  ]);
-}
-
-async function saveRatingToDB(participantId, participantName, imageIdx, img, rating, comment) {
-  await sb.insert('ratings', {
-    participant_id:   participantId,
-    participant_name: participantName,
-    image_index:      imageIdx,
-    celeb_id:         img.celebId    || '',
-    celeb_name:       img.celebName  || '',
-    photo_index:      img.photoIdx   ?? 0,
-    rating:           rating,
-    comment:          comment,
-    created_at:       new Date().toISOString()
-  });
-}
-
-/* ═══════════════════════════════════════════════════════
-   INIT DB — non-blocking, UI shows immediately
-═══════════════════════════════════════════════════════ */
-async function initDB() {
-  const pill = document.getElementById('db-status-pill');
-  const lbl  = document.getElementById('db-status-label');
-  try {
-    // Quick ping
-    await sb.select('study_config', 'limit=1');
-
-    // Load all data from Supabase
-    await loadStateFromSupabase();
-
-    pill.className = 'db-pill connected';
-    lbl.textContent = 'Database Connected ✓';
-  } catch (err) {
-    console.error('[VISAGE] DB Error:', err.message);
-    pill.className = 'db-pill error';
-    lbl.textContent = 'DB Error — run SQL Setup first';
-  }
-}
-
-// Run after page is ready, non-blocking
-window.addEventListener('DOMContentLoaded', () => { initDB(); });
-
-/* ═══════════════════════════════════════════════════════
-   TOAST
-═══════════════════════════════════════════════════════ */
+// ──────────────────────────────────────
+// TOAST
+// ──────────────────────────────────────
 let toastTimer;
 function showToast(msg, type = '') {
   const t = document.getElementById('toast');
   t.textContent = msg;
-  t.className = 'show' + (type ? ' ' + type : '');
+  t.className = 'show ' + type;
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => { t.className = ''; }, 3500);
 }
 
-/* ═══════════════════════════════════════════════════════
-   NAVIGATION
-═══════════════════════════════════════════════════════ */
+// ──────────────────────────────────────
+// NAVIGATION
+// ──────────────────────────────────────
 function showScreen(id) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   const el = document.getElementById('screen-' + id);
@@ -641,25 +649,31 @@ function goToParticipantLogin() {
 function verifyAdmin() {
   const pw = document.getElementById('admin-pw-input').value;
   const correct = state.settings?.adminPw || 'admin123';
-  if (pw !== correct) { showToast('Invalid password', 'error'); document.getElementById('admin-pw-input').value = ''; return; }
-  showScreen('admin');
-  refreshAdminStats();
-  renderCelebGrid();
+  if (pw === correct) {
+    showScreen('admin');
+    refreshAdminStats();
+    renderCelebGrid();
+  } else {
+    showToast('Invalid password', 'error');
+    document.getElementById('admin-pw-input').value = '';
+  }
 }
 
-/* ═══════════════════════════════════════════════════════
-   ADMIN PANELS
-═══════════════════════════════════════════════════════ */
+// ──────────────────────────────────────
+// ADMIN PANEL TABS
+// ──────────────────────────────────────
 function switchAdminPanel(name, btn) {
   document.querySelectorAll('.admin-panel').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.sidebar-btn').forEach(b => b.classList.remove('active'));
   const panel = document.getElementById('panel-' + name);
   if (panel) panel.classList.add('active');
   if (btn) btn.classList.add('active');
-  if (name === 'results')      renderResults();
+  if (name === 'results') renderResults();
   if (name === 'participants') renderParticipants();
-  if (name === 'shuffle')      renderShuffleStatus();
-  if (name === 'settings')     document.getElementById('settings-title').value = state.settings?.title || '';
+  if (name === 'shuffle') renderShuffleStatus();
+  if (name === 'settings') {
+    document.getElementById('settings-title').value = state.settings?.title || '';
+  }
 }
 
 function refreshAdminStats() {
@@ -668,14 +682,14 @@ function refreshAdminStats() {
     `${state.celebrities.length} CELEBS · ${total} PHOTOS · ${state.imageOrder.length} ORDER`;
 }
 
-/* ═══════════════════════════════════════════════════════
-   CELEBRITY MANAGEMENT
-═══════════════════════════════════════════════════════ */
+// ──────────────────────────────────────
+// CELEBRITY MANAGEMENT
+// ──────────────────────────────────────
 let celebCounter = 0;
 
 function initCelebCounter() {
   celebCounter = state.celebrities.reduce((max, c) => {
-    const n = parseInt((c.id || '').replace(/\D/g, '')) || 0;
+    const n = parseInt((c.id || '').replace(/\D/g,'')) || 0;
     return Math.max(max, n);
   }, 0);
 }
@@ -685,8 +699,9 @@ function renderCelebGrid() {
   const grid = document.getElementById('celeb-grid');
   grid.innerHTML = '';
   if (state.celebrities.length === 0) {
+    // Add 5 starter cards
     for (let i = 0; i < 5; i++) createCelebEntry();
-    saveState().catch(() => {});
+    saveState();
   }
   state.celebrities.forEach((_, idx) => appendCelebCard(idx));
   updatePhotoCounts();
@@ -694,153 +709,175 @@ function renderCelebGrid() {
 
 function createCelebEntry() {
   celebCounter++;
-  state.celebrities.push({ id: 'C' + String(celebCounter).padStart(2, '0'), name: '', photos: [null,null,null,null,null] });
+  state.celebrities.push({
+    id: 'C' + String(celebCounter).padStart(2, '0'),
+    name: '',
+    photos: [null, null, null, null, null]
+  });
 }
 
-async function addCelebCard() {
-  if (state.celebrities.length >= 20) { showToast('Maximum 20 celebrities', 'error'); return; }
-  createCelebEntry();
-  const idx = state.celebrities.length - 1;
-  try {
-    await sb.upsert('celebrities', [{ id: state.celebrities[idx].id, name: '', photos: [] }]);
-    saveLocal();
-    appendCelebCard(idx);
-    updatePhotoCounts();
-    refreshAdminStats();
-    showToast('Celebrity added', 'success');
-  } catch(err) {
-    showToast('Error adding celebrity: ' + err.message, 'error');
-    console.error(err);
+function addCelebCard() {
+  if (state.celebrities.length >= 20) {
+    showToast('Maximum 20 celebrities allowed', 'error');
+    return;
   }
+  createCelebEntry();
+  saveState();
+  const idx = state.celebrities.length - 1;
+  appendCelebCard(idx);
+  updatePhotoCounts();
+  refreshAdminStats();
 }
 
 function appendCelebCard(idx) {
   const grid = document.getElementById('celeb-grid');
   const celeb = state.celebrities[idx];
-  if (!celeb) return;
   const card = document.createElement('div');
-  card.className = 'celeb-card'; card.id = 'celeb-card-' + idx;
+  card.className = 'celeb-card';
+  card.id = 'celeb-card-' + idx;
+
   const slots = (celeb.photos || [null,null,null,null,null]).map((photo, pi) => `
     <div class="photo-slot" onclick="triggerPhotoUpload(${idx},${pi})">
       ${photo ? `<img src="${photo}" alt="P${pi+1}"><button class="remove-photo" onclick="removePhoto(event,${idx},${pi})">✕</button>` : '<span class="slot-icon">+</span>'}
       <input type="file" accept="image/*" onchange="handlePhotoUpload(event,${idx},${pi})">
-    </div>`).join('');
+    </div>
+  `).join('');
+
   card.innerHTML = `
     <div class="celeb-row-header">
       <span class="celeb-id-badge">${celeb.id}</span>
-      <button class="btn btn-danger" style="padding:4px 10px;font-size:9px" onclick="removeCeleb(${idx})">Remove</button>
+      <button class="btn btn-danger" style="padding:4px 10px;font-size:9px;letter-spacing:1px" onclick="removeCeleb(${idx})">Remove</button>
     </div>
     <div class="celeb-name-input">
       <input type="text" value="${celeb.name || ''}" placeholder="Celebrity name..." onchange="updateCelebName(${idx},this.value)">
     </div>
     <div class="photo-slots">${slots}</div>
-    <div class="photo-count">Photos: <span id="photo-count-${idx}">${(celeb.photos||[]).filter(Boolean).length}</span> / 5</div>`;
+    <div class="photo-count">Photos: <span id="photo-count-${idx}">${(celeb.photos||[]).filter(Boolean).length}</span> / 5</div>
+  `;
   grid.appendChild(card);
 }
 
 function triggerPhotoUpload(ci, pi) {
   const card = document.getElementById('celeb-card-' + ci);
   if (!card) return;
-  card.querySelectorAll('.photo-slot input[type="file"]')[pi]?.click();
+  const inputs = card.querySelectorAll('.photo-slot input[type="file"]');
+  if (inputs[pi]) inputs[pi].click();
 }
 
-async function handlePhotoUpload(event, ci, pi) {
-  const file = event.target.files[0]; if (!file) return;
+function handlePhotoUpload(event, ci, pi) {
+  const file = event.target.files[0];
+  if (!file) return;
   const reader = new FileReader();
-  reader.onload = async e => {
+  reader.onload = e => {
     state.celebrities[ci].photos[pi] = e.target.result;
-    try {
-      await sb.upsert('celebrities', [{ id: state.celebrities[ci].id, name: state.celebrities[ci].name, photos: state.celebrities[ci].photos }]);
-      saveLocal();
-      rebuildCelebCard(ci); updatePhotoCounts(); refreshAdminStats();
-      showToast('Photo saved ✓', 'success');
-    } catch(err) { showToast('Photo save error: ' + err.message, 'error'); }
+    saveState();
+    rebuildCelebCard(ci);
+    updatePhotoCounts();
+    refreshAdminStats();
   };
   reader.readAsDataURL(file);
 }
 
-async function removePhoto(event, ci, pi) {
+function removePhoto(event, ci, pi) {
   event.stopPropagation();
   state.celebrities[ci].photos[pi] = null;
-  try {
-    await sb.upsert('celebrities', [{ id: state.celebrities[ci].id, name: state.celebrities[ci].name, photos: state.celebrities[ci].photos }]);
-    saveLocal(); rebuildCelebCard(ci); updatePhotoCounts();
-  } catch(err) { showToast(err.message, 'error'); }
+  saveState();
+  rebuildCelebCard(ci);
+  updatePhotoCounts();
 }
 
-async function removeCeleb(idx) {
+function removeCeleb(idx) {
   if (!confirm('Remove this celebrity and all their photos?')) return;
-  const celebId = state.celebrities[idx].id;
-  try {
-    await sb.delete('celebrities', `id=eq.${encodeURIComponent(celebId)}`);
-    state.celebrities.splice(idx, 1);
-    saveLocal();
-    const grid = document.getElementById('celeb-grid'); grid.innerHTML = '';
-    state.celebrities.forEach((_, i) => appendCelebCard(i));
-    updatePhotoCounts(); refreshAdminStats();
-    showToast('Celebrity removed', 'success');
-  } catch(err) { showToast(err.message, 'error'); }
+  state.celebrities.splice(idx, 1);
+  saveState();
+  // Re-render all
+  const grid = document.getElementById('celeb-grid');
+  grid.innerHTML = '';
+  state.celebrities.forEach((_, i) => appendCelebCard(i));
+  updatePhotoCounts();
+  refreshAdminStats();
 }
 
 function rebuildCelebCard(idx) {
   const old = document.getElementById('celeb-card-' + idx);
   const grid = document.getElementById('celeb-grid');
-  const pos = old ? Array.from(grid.children).indexOf(old) : -1;
+  const cards = Array.from(grid.children);
+  const pos = cards.indexOf(old);
   if (old) old.remove();
+  // Temporarily append then move
   appendCelebCard(idx);
-  const fresh = document.getElementById('celeb-card-' + idx);
-  if (fresh && pos >= 0 && pos < grid.children.length) grid.insertBefore(fresh, grid.children[pos]);
+  const newCard = document.getElementById('celeb-card-' + idx);
+  if (pos >= 0 && pos < grid.children.length) {
+    grid.insertBefore(newCard, grid.children[pos]);
+  }
 }
 
 function updateCelebName(idx, name) {
   state.celebrities[idx].name = name;
-  saveLocal();
+  saveState();
 }
 
-async function saveAllCelebs() {
+function saveAllCelebs() {
   state.celebrities.forEach((c, idx) => {
     const card = document.getElementById('celeb-card-' + idx);
-    if (card) { const inp = card.querySelector('input[type="text"]'); if (inp) c.name = inp.value; }
-  });
-  try {
-    if (state.celebrities.length > 0) {
-      await sb.upsert('celebrities', state.celebrities.map(c => ({ id: c.id, name: c.name || '', photos: c.photos || [] })));
+    if (card) {
+      const input = card.querySelector('input[type="text"]');
+      if (input) c.name = input.value;
     }
-    saveLocal(); refreshAdminStats(); showToast('All celebrities saved ✓', 'success');
-  } catch(err) { showToast('Save error: ' + err.message, 'error'); }
+  });
+  saveState();
+  refreshAdminStats();
+  showToast('All celebrities saved', 'success');
 }
 
 function updatePhotoCounts() {
   let total = 0;
   state.celebrities.forEach((c, idx) => {
-    const n = (c.photos || []).filter(Boolean).length; total += n;
-    const el = document.getElementById('photo-count-' + idx); if (el) el.textContent = n;
+    const n = (c.photos || []).filter(Boolean).length;
+    total += n;
+    const el = document.getElementById('photo-count-' + idx);
+    if (el) el.textContent = n;
   });
-  document.getElementById('total-photo-count').textContent = `${total} / ${state.celebrities.length * 5} photos uploaded`;
+  document.getElementById('total-photo-count').textContent =
+    `${total} / ${state.celebrities.length * 5} photos uploaded`;
 }
 
-/* ═══════════════════════════════════════════════════════
-   SHUFFLE
-═══════════════════════════════════════════════════════ */
-async function generateShuffle() {
+// ──────────────────────────────────────
+// SHUFFLE
+// ──────────────────────────────────────
+function generateShuffle() {
   const images = [];
-  state.celebrities.forEach(c => (c.photos || []).forEach((photo, pi) => {
-    if (photo) images.push({ celebId: c.id, photoIdx: pi, celebName: c.name, photo });
-  }));
-  if (!images.length) { showToast('No photos uploaded yet', 'error'); return; }
+  state.celebrities.forEach(c => {
+    (c.photos || []).forEach((photo, pi) => {
+      if (photo) images.push({ celebId: c.id, photoIdx: pi, celebName: c.name, photo });
+    });
+  });
 
+  if (images.length === 0) { showToast('No photos uploaded yet', 'error'); return; }
+
+  // Fisher-Yates
   const arr = [...images];
   for (let i = arr.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1)); [arr[i], arr[j]] = [arr[j], arr[i]];
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
   }
-  let passes = 0, changed = true;
+
+  // Post-shuffle pass: break consecutive runs
+  let passes = 0;
+  let changed = true;
   while (changed && passes < 500) {
-    changed = false; passes++;
+    changed = false;
+    passes++;
     for (let i = 0; i < arr.length - 1; i++) {
       if (arr[i].celebId === arr[i + 1].celebId) {
+        // Find a swap target
         for (let j = i + 2; j < arr.length; j++) {
-          if (arr[j].celebId !== arr[i].celebId && arr[j].celebId !== (arr[i + 2] || {}).celebId && (i === 0 || arr[j].celebId !== arr[i - 1].celebId)) {
-            [arr[i + 1], arr[j]] = [arr[j], arr[i + 1]]; changed = true; break;
+          if (arr[j].celebId !== arr[i].celebId &&
+              arr[j].celebId !== (arr[i + 2] || {}).celebId &&
+              (i === 0 || arr[j].celebId !== arr[i - 1].celebId)) {
+            [arr[i + 1], arr[j]] = [arr[j], arr[i + 1]];
+            changed = true;
+            break;
           }
         }
       }
@@ -848,251 +885,294 @@ async function generateShuffle() {
   }
 
   state.imageOrder = arr;
-  try {
-    // Save metadata only (no base64 blobs in DB)
-    const meta = arr.map(({ photo, ...rest }) => rest);
-    await sb.upsert('study_config', [{ key: 'image_order', value: meta, updated_at: new Date().toISOString() }]);
-    saveLocal();
-    renderShuffleStatus();
-    showToast(`Shuffled ${arr.length} images ✓`, 'success');
-  } catch(err) { showToast('Shuffle save error: ' + err.message, 'error'); }
+  saveState();
+  renderShuffleStatus();
+  showToast(`Shuffled ${arr.length} images (${passes} passes)`, 'success');
 }
 
 function renderShuffleStatus() {
   const statusEl = document.getElementById('shuffle-status');
   const previewEl = document.getElementById('shuffle-preview');
-  if (!state.imageOrder.length) { statusEl.textContent = 'No order generated yet.'; previewEl.style.display = 'none'; return; }
+  if (!state.imageOrder.length) {
+    statusEl.textContent = 'No order generated yet.';
+    previewEl.style.display = 'none';
+    return;
+  }
   let maxRun = 1, cur = 1, runs = 0;
   for (let i = 1; i < state.imageOrder.length; i++) {
-    if (state.imageOrder[i].celebId === state.imageOrder[i-1].celebId) { cur++; if (cur > maxRun) maxRun = cur; }
-    else { if (cur > 1) runs++; cur = 1; }
+    if (state.imageOrder[i].celebId === state.imageOrder[i-1].celebId) {
+      cur++; if (cur > maxRun) maxRun = cur;
+    } else {
+      if (cur > 1) runs++;
+      cur = 1;
+    }
   }
-  statusEl.innerHTML = `✓ ${state.imageOrder.length} images &nbsp;·&nbsp; Max consecutive: <span style="color:${maxRun > 1 ? 'var(--red)' : 'var(--green)'}">${maxRun}</span>`;
+  statusEl.innerHTML = `✓ ${state.imageOrder.length} images ordered &nbsp;·&nbsp; Max consecutive same-celeb: <span style="color:${maxRun > 1 ? 'var(--red)' : 'var(--green)'}">${maxRun}</span> &nbsp;·&nbsp; Consecutive runs: ${runs}`;
   previewEl.style.display = 'block';
   previewEl.innerHTML = state.imageOrder.slice(0, 40).map((img, i) =>
     `<div class="shuffle-item"><span class="idx">#${i+1}</span><span class="cid">${img.celebId}</span><span style="color:var(--text-dim)">${img.celebName || 'Unnamed'} · Photo ${img.photoIdx+1}</span></div>`
   ).join('') + (state.imageOrder.length > 40 ? `<div class="shuffle-item" style="color:var(--muted)">… and ${state.imageOrder.length - 40} more</div>` : '');
 }
 
-async function clearShuffle() {
+function clearShuffle() {
   state.imageOrder = [];
-  try { await sb.upsert('study_config', [{ key: 'image_order', value: [], updated_at: new Date().toISOString() }]); }
-  catch(e) {}
-  saveLocal(); renderShuffleStatus(); showToast('Order cleared');
+  saveState();
+  renderShuffleStatus();
+  showToast('Order cleared');
 }
 
-/* ═══════════════════════════════════════════════════════
-   RESULTS & PARTICIPANTS
-═══════════════════════════════════════════════════════ */
-async function renderResults() {
+// ──────────────────────────────────────
+// IMPORT / EXPORT
+// ──────────────────────────────────────
+function exportDataset() {
+  const data = { celebrities: state.celebrities, imageOrder: state.imageOrder, settings: state.settings, exportedAt: new Date().toISOString() };
+  dlJSON(data, 'visage_dataset.json');
+  showToast('Dataset exported', 'success');
+}
+
+function importDataset(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const data = JSON.parse(e.target.result);
+      if (data.celebrities) state.celebrities = data.celebrities;
+      if (data.imageOrder) state.imageOrder = data.imageOrder;
+      if (data.settings) state.settings = Object.assign({}, state.settings, data.settings);
+      saveState();
+      renderCelebGrid();
+      refreshAdminStats();
+      showToast('Dataset imported', 'success');
+    } catch(err) { showToast('Invalid JSON file', 'error'); }
+  };
+  reader.readAsText(file);
+  event.target.value = '';
+}
+
+function exportCSV() {
+  const rows = [['ParticipantID','ParticipantName','ImageIndex','CelebID','CelebName','PhotoIndex','Rating','Comment','Timestamp']];
+  Object.entries(state.participants || {}).forEach(([pid, p]) => {
+    (p.ratings || []).forEach(r => {
+      const img = state.imageOrder[r.imageIdx] || {};
+      rows.push([pid, p.name || pid, r.imageIdx, img.celebId || '', img.celebName || '', img.photoIdx ?? '', r.rating, (r.comment || '').replace(/"/g,'""'), r.ts || '']);
+    });
+  });
+  const csv = rows.map(r => r.map(v => `"${v}"`).join(',')).join('\n');
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'visage_ratings.csv'; a.click();
+  URL.revokeObjectURL(url);
+  showToast('CSV exported', 'success');
+}
+
+function dlJSON(data, filename) {
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename; a.click();
+  URL.revokeObjectURL(url);
+}
+
+function clearAllRatings() {
+  if (!confirm('Clear ALL participant ratings? Cannot be undone.')) return;
+  state.participants = {};
+  saveState();
+  showToast('All ratings cleared', 'success');
+}
+
+function clearEverything() {
+  if (!confirm('Clear EVERYTHING — photos, order, ratings? Cannot be undone.')) return;
+  localStorage.removeItem(STORAGE_KEY);
+  state = defaultState();
+  renderCelebGrid();
+  refreshAdminStats();
+  showToast('All data cleared', 'success');
+}
+
+// ──────────────────────────────────────
+// RESULTS VIEW
+// ──────────────────────────────────────
+function renderResults() {
   const el = document.getElementById('results-content');
-  if (!state.imageOrder.length) { el.innerHTML = '<p style="color:var(--text-dim);font-size:12px;margin-top:16px">No image order generated yet.</p>'; return; }
-
-  // Reload ratings from Supabase
-  try {
-    const allRatings = await sb.select('ratings', 'order=created_at');
-    const rMap = {};
-    allRatings.forEach(r => { if (!rMap[r.image_index]) rMap[r.image_index] = []; rMap[r.image_index].push(r); });
-
-    const rows = state.imageOrder.map((img, idx) => {
-      const list = rMap[idx] || [];
-      const avg = list.length ? (list.reduce((s, r) => s + r.rating, 0) / list.length).toFixed(1) : '—';
-      return `<tr onclick="showImageModal(${idx})" style="cursor:pointer">
-        <td style="color:var(--text-dim)">#${idx+1}</td>
-        <td>${img.celebName || img.celebId}</td>
-        <td>Photo ${(img.photoIdx ?? 0) + 1}</td>
-        <td>${list.length}</td>
-        <td><span class="rating-badge">${avg}</span></td>
-      </tr>`;
-    }).join('');
-    el.innerHTML = `<table class="results-table"><thead><tr><th>#</th><th>Celebrity</th><th>Photo</th><th>Ratings</th><th>Avg</th></tr></thead><tbody>${rows}</tbody></table>`;
-  } catch(err) { el.innerHTML = `<p style="color:var(--red);font-size:12px">${err.message}</p>`; }
+  if (!state.imageOrder.length) {
+    el.innerHTML = '<p style="color:var(--text-dim);font-size:12px;margin-top:16px">No image order generated yet.</p>';
+    return;
+  }
+  const rMap = {};
+  Object.entries(state.participants || {}).forEach(([pid, p]) => {
+    (p.ratings || []).forEach(r => {
+      if (!rMap[r.imageIdx]) rMap[r.imageIdx] = [];
+      rMap[r.imageIdx].push({ name: p.name || pid, rating: r.rating, comment: r.comment });
+    });
+  });
+  const rows = state.imageOrder.map((img, idx) => {
+    const list = rMap[idx] || [];
+    const avg = list.length ? (list.reduce((s, r) => s + r.rating, 0) / list.length).toFixed(1) : '—';
+    return `<tr style="cursor:pointer" onclick="showImageModal(${idx})">
+      <td style="color:var(--text-dim)">#${idx+1}</td>
+      <td style="color:var(--white)">${img.celebName || img.celebId}</td>
+      <td>Photo ${(img.photoIdx ?? 0)+1}</td>
+      <td>${list.length}</td>
+      <td><span class="rating-badge">${avg}</span></td>
+    </tr>`;
+  }).join('');
+  el.innerHTML = `<table class="results-table">
+    <thead><tr><th>#</th><th>Celebrity</th><th>Photo</th><th>Ratings</th><th>Avg</th></tr></thead>
+    <tbody>${rows}</tbody>
+  </table>
+  <p style="margin-top:12px;font-size:10px;color:var(--text-dim)">↑ Click any row to view individual comments.</p>`;
 }
 
-async function showImageModal(imgIdx) {
-  const img = state.imageOrder[imgIdx]; if (!img) return;
+function showImageModal(imgIdx) {
+  const img = state.imageOrder[imgIdx];
+  if (!img) return;
   const celeb = state.celebrities.find(c => c.id === img.celebId);
-  const src = celeb?.photos?.[img.photoIdx] || img.photo || '';
-
-  let ratings = [];
-  try { ratings = await sb.select('ratings', `image_index=eq.${imgIdx}&order=created_at&select=participant_name,rating,comment`); }
-  catch(e) {}
-
+  const src = celeb?.photos?.[img.photoIdx] || '';
+  const ratings = [];
+  Object.entries(state.participants || {}).forEach(([pid, p]) => {
+    const r = (p.ratings || []).find(r => r.imageIdx === imgIdx);
+    if (r) ratings.push({ name: p.name || pid, rating: r.rating, comment: r.comment });
+  });
   const avg = ratings.length ? (ratings.reduce((s, r) => s + r.rating, 0) / ratings.length).toFixed(1) : '—';
-  const cmts = ratings.map(r => `
+  const comments = ratings.map(r => `
     <div class="comment-item">
-      <div class="comment-participant">${r.participant_name || '—'}<span class="comment-rating">★ ${r.rating}/10</span></div>
-      <div class="comment-text">${r.comment || '<em style="opacity:.5">No comment</em>'}</div>
-    </div>`).join('') || '<p style="color:var(--text-dim);font-size:12px">No ratings yet.</p>';
-
+      <div class="comment-participant">${r.name} <span class="comment-rating">★ ${r.rating}/10</span></div>
+      <div class="comment-text">${r.comment || '<em style="opacity:0.5">No comment provided</em>'}</div>
+    </div>`).join('');
   document.getElementById('modal-content').innerHTML = `
     <div style="overflow:hidden;margin-bottom:16px">
-      ${src ? `<img src="${src}" class="modal-image" alt="">` : '<div style="width:200px;height:200px;background:var(--surface);float:left;margin:0 24px 16px 0;display:flex;align-items:center;justify-content:center;font-size:24px;color:var(--muted)">◈</div>'}
+      ${src ? `<img src="${src}" class="modal-image" alt="">` : '<div style="width:200px;height:200px;background:var(--surface);float:left;margin:0 24px 16px 0;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:24px">◈</div>'}
       <div>
         <div style="font-family:\'Playfair Display\',serif;font-size:22px;font-weight:700;color:var(--white);margin-bottom:4px">${img.celebName || img.celebId}</div>
-        <div style="font-size:11px;color:var(--text-dim);margin-bottom:16px">Photo ${(img.photoIdx??0)+1} · Image #${imgIdx+1}</div>
+        <div style="font-size:11px;color:var(--text-dim);letter-spacing:1px;margin-bottom:16px">Photo ${(img.photoIdx??0)+1} &nbsp;·&nbsp; Image #${imgIdx+1}</div>
         <div style="font-family:\'Playfair Display\',serif;font-size:36px;font-weight:700;color:var(--gold)">${avg}</div>
-        <div style="font-size:10px;color:var(--text-dim)">Average · ${ratings.length} response${ratings.length!==1?'s':''}</div>
+        <div style="font-size:10px;color:var(--text-dim);letter-spacing:1px">Average · ${ratings.length} response${ratings.length!==1?'s':''}</div>
       </div>
     </div>
-    <div style="height:1px;background:linear-gradient(90deg,transparent,var(--gold-dim),transparent);margin:20px 0"></div>
-    <div class="comment-list">${cmts}</div>`;
+    <div class="divider"></div>
+    <div class="comment-list">${comments || '<p style="color:var(--text-dim);font-size:12px">No ratings yet.</p>'}</div>`;
   document.getElementById('image-modal').classList.add('open');
 }
 
-function closeModal() { document.getElementById('image-modal').classList.remove('open'); }
+function closeModal() {
+  document.getElementById('image-modal').classList.remove('open');
+}
 document.getElementById('image-modal').addEventListener('click', e => { if (e.target === document.getElementById('image-modal')) closeModal(); });
 
-async function renderParticipants() {
-  const ge = document.getElementById('participants-stats'), te = document.getElementById('participants-table');
-  ge.innerHTML = ''; te.innerHTML = '<tr><td colspan="4" style="color:var(--text-dim);text-align:center;padding:16px">Loading…</td></tr>';
-
-  try {
-    const allRatings = await sb.select('ratings', 'order=created_at');
-    const total = state.imageOrder.length || 100;
-    const pm = {};
-    allRatings.forEach(r => {
-      if (!pm[r.participant_id]) pm[r.participant_id] = { name: r.participant_name, ratings: [] };
-      pm[r.participant_id].ratings.push(r);
-    });
-    const ids = Object.keys(pm);
-    const done = ids.filter(id => pm[id].ratings.length >= total).length;
-
-    ge.innerHTML = `
-      <div class="stat-card"><div class="stat-value">${ids.length}</div><div class="stat-label">Participants</div></div>
-      <div class="stat-card"><div class="stat-value">${done}</div><div class="stat-label">Completed</div></div>
-      <div class="stat-card"><div class="stat-value">${ids.length - done}</div><div class="stat-label">In Progress</div></div>
-      <div class="stat-card"><div class="stat-value">${total}</div><div class="stat-label">Total Images</div></div>`;
-
-    te.innerHTML = ids.map(id => {
-      const pp = pm[id], n = pp.ratings.length, pct = Math.round(n / total * 100), ok = n >= total;
-      const avg = n ? (pp.ratings.reduce((s,r) => s + r.rating, 0) / n).toFixed(1) : '—';
-      return `<tr>
-        <td style="color:var(--white)">${pp.name || id}</td>
-        <td><div style="font-size:11px;margin-bottom:4px">${n} / ${total} (${pct}%)</div><div class="progress-fill-mini"><div class="progress-fill-mini-inner" style="width:${pct}%"></div></div></td>
-        <td><span style="color:${ok?'var(--green)':'var(--text-dim)'}">${ok?'✓ Complete':'In Progress'}</span></td>
-        <td><span class="rating-badge">${avg}</span></td>
-      </tr>`;
-    }).join('') || '<tr><td colspan="4" style="color:var(--text-dim);text-align:center;padding:24px">No participants yet</td></tr>';
-  } catch(err) { te.innerHTML = `<tr><td colspan="4" style="color:var(--red)">${err.message}</td></tr>`; }
+// ──────────────────────────────────────
+// PARTICIPANTS VIEW
+// ──────────────────────────────────────
+function renderParticipants() {
+  const p = state.participants || {};
+  const ids = Object.keys(p);
+  const total = state.imageOrder.length || 100;
+  const completed = ids.filter(id => (p[id].ratings?.length || 0) >= total).length;
+  document.getElementById('participants-stats').innerHTML = `
+    <div class="stat-card"><div class="stat-value">${ids.length}</div><div class="stat-label">Total Participants</div></div>
+    <div class="stat-card"><div class="stat-value">${completed}</div><div class="stat-label">Completed</div></div>
+    <div class="stat-card"><div class="stat-value">${ids.length - completed}</div><div class="stat-label">In Progress</div></div>
+    <div class="stat-card"><div class="stat-value">${total}</div><div class="stat-label">Total Images</div></div>`;
+  const rows = ids.map(id => {
+    const pp = p[id];
+    const done = pp.ratings?.length || 0;
+    const pct = total > 0 ? Math.round(done / total * 100) : 0;
+    const isComplete = done >= total;
+    const avg = done > 0 ? (pp.ratings.reduce((s, r) => s + r.rating, 0) / done).toFixed(1) : '—';
+    return `<tr>
+      <td style="color:var(--white)">${pp.name || id}</td>
+      <td><div style="font-size:11px;margin-bottom:4px">${done} / ${total} (${pct}%)</div><div class="progress-fill-mini"><div class="progress-fill-mini-inner" style="width:${pct}%"></div></div></td>
+      <td><span style="color:${isComplete ? 'var(--green)' : 'var(--text-dim)'}">${isComplete ? '✓ Complete' : 'In Progress'}</span></td>
+      <td><span class="rating-badge">${avg}</span></td>
+    </tr>`;
+  }).join('');
+  document.getElementById('participants-table').innerHTML = rows ||
+    '<tr><td colspan="4" style="color:var(--text-dim);text-align:center;padding:24px">No participants yet</td></tr>';
 }
 
-/* ═══════════════════════════════════════════════════════
-   SETTINGS / EXPORT / DANGER
-═══════════════════════════════════════════════════════ */
-async function changePassword() {
+// ──────────────────────────────────────
+// SETTINGS
+// ──────────────────────────────────────
+function changePassword() {
   const pw = document.getElementById('settings-pw').value.trim();
-  if (!pw) { showToast('Enter a password', 'error'); return; }
+  if (!pw) { showToast('Enter a new password', 'error'); return; }
   state.settings.adminPw = pw;
-  try { await sb.upsert('study_config', [{ key: 'main_settings', value: state.settings, updated_at: new Date().toISOString() }]); saveLocal(); document.getElementById('settings-pw').value = ''; showToast('Password updated ✓', 'success'); }
-  catch(err) { showToast(err.message, 'error'); }
+  saveState();
+  document.getElementById('settings-pw').value = '';
+  showToast('Password updated', 'success');
 }
 
-async function saveSettings() {
+function saveSettings() {
   state.settings.title = document.getElementById('settings-title').value;
-  try { await sb.upsert('study_config', [{ key: 'main_settings', value: state.settings, updated_at: new Date().toISOString() }]); saveLocal(); showToast('Settings saved ✓', 'success'); }
-  catch(err) { showToast(err.message, 'error'); }
+  saveState();
+  showToast('Settings saved', 'success');
 }
 
-async function exportCSV() {
-  try {
-    const allRatings = await sb.select('ratings', 'order=created_at');
-    const rows = [['ParticipantID','ParticipantName','ImageIndex','CelebID','CelebName','PhotoIndex','Rating','Comment','Timestamp']];
-    allRatings.forEach(r => rows.push([r.participant_id, r.participant_name, r.image_index, r.celeb_id, r.celeb_name, r.photo_index, r.rating, (r.comment||'').replace(/"/g,'""'), r.created_at]));
-    const csv = rows.map(r => r.map(v => `"${v}"`).join(',')).join('\n');
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
-    a.download = 'visage_ratings.csv'; a.click();
-    showToast('CSV exported ✓', 'success');
-  } catch(err) { showToast(err.message, 'error'); }
-}
+// ──────────────────────────────────────
+// PARTICIPANT LOGIN
+// ──────────────────────────────────────
+let currentParticipant = null;
+let sessionStart = null;
 
-async function clearAllRatings() {
-  if (!confirm('Clear ALL ratings from database? Cannot be undone.')) return;
-  try { await sb.delete('ratings', 'id=neq.00000000-0000-0000-0000-000000000000'); state.participants = {}; saveLocal(); showToast('All ratings cleared ✓', 'success'); }
-  catch(err) { showToast(err.message, 'error'); }
-}
-
-async function clearEverything() {
-  if (!confirm('Delete ALL data from database? Cannot be undone.')) return;
-  try {
-    await sb.delete('ratings',      'id=neq.00000000-0000-0000-0000-000000000000');
-    await sb.delete('celebrities',  'id=neq.__x__');
-    await sb.delete('study_config', 'key=neq.__x__');
-    state = defaultState(); saveLocal(); renderCelebGrid(); refreshAdminStats();
-    showToast('All data cleared ✓', 'success');
-  } catch(err) { showToast(err.message, 'error'); }
-}
-
-/* ═══════════════════════════════════════════════════════
-   PARTICIPANT LOGIN
-═══════════════════════════════════════════════════════ */
-let currentParticipant = null, currentParticipantName = null, sessionStart = null;
-
-async function checkReturning() {
+function checkReturning() {
   const raw = document.getElementById('participant-id-input').value.trim();
+  const id = raw.toLowerCase().replace(/\s+/g,'_');
   const msg = document.getElementById('returning-msg');
-  if (!raw) { msg.style.display = 'none'; return; }
-  const pid = raw.toLowerCase().replace(/\s+/g,'_');
-  try {
-    const rows = await sb.select('ratings', `participant_id=eq.${encodeURIComponent(pid)}&select=id`);
-    const n = rows.length, total = state.imageOrder.length || 100;
-    if (n > 0) { msg.style.display = 'block'; msg.innerHTML = `Returning · <strong>${n}</strong> / ${total} images completed`; }
-    else msg.style.display = 'none';
-  } catch(_) { msg.style.display = 'none'; }
+  if (id && state.participants[id]) {
+    const pp = state.participants[id];
+    const done = pp.ratings?.length || 0;
+    const total = state.imageOrder.length || 100;
+    msg.style.display = 'block';
+    msg.innerHTML = `Returning: <strong>${pp.name || id}</strong> &nbsp;·&nbsp; ${done} / ${total} images completed`;
+  } else {
+    msg.style.display = 'none';
+  }
 }
 
-async function participantLogin() {
+function participantLogin() {
   const raw = document.getElementById('participant-id-input').value.trim();
   if (!raw) { showToast('Please enter your name or ID', 'error'); return; }
-  if (!state.imageOrder.length) { showToast('Study not ready — ask the administrator', 'error'); return; }
-
-  currentParticipant     = raw.toLowerCase().replace(/\s+/g,'_');
-  currentParticipantName = raw;
-  sessionStart           = Date.now();
-
-  // Hydrate image order with photo data
-  state.imageOrder = state.imageOrder.map(x => {
-    const c = state.celebrities.find(cc => cc.id === x.celebId);
-    return { ...x, photo: c?.photos?.[x.photoIdx] || x.photo || null };
-  });
-
-  // Find resume point from DB
-  try {
-    const myRatings = await sb.select('ratings', `participant_id=eq.${encodeURIComponent(currentParticipant)}&select=image_index&order=image_index`);
-    const ratedIndices = new Set(myRatings.map(r => r.image_index));
-    state.participants[currentParticipant] = state.participants[currentParticipant] || { name: raw, ratings: [] };
-    // currentImageIdx will be set in initRatingScreen based on DB count
-    window._resumeIdx = myRatings.length;
-  } catch(e) {
-    window._resumeIdx = (state.participants[currentParticipant]?.ratings || []).length;
+  if (!state.imageOrder.length) { showToast('Study not ready — contact administrator', 'error'); return; }
+  const id = raw.toLowerCase().replace(/\s+/g,'_');
+  currentParticipant = id;
+  sessionStart = Date.now();
+  if (!state.participants[id]) {
+    state.participants[id] = { name: raw, ratings: [], startTs: new Date().toISOString() };
+  } else {
+    state.participants[id].name = raw;
   }
-
+  saveState();
   initRatingScreen();
 }
 
-/* ═══════════════════════════════════════════════════════
-   RATING SCREEN
-═══════════════════════════════════════════════════════ */
-let currentImageIdx = 0, currentRating = 0;
+// ──────────────────────────────────────
+// RATING SCREEN
+// ──────────────────────────────────────
+let currentImageIdx = 0;
+let currentRating = 0;
 
 function initRatingScreen() {
-  currentImageIdx = window._resumeIdx || 0;
-  currentRating   = 0;
-  if (currentImageIdx >= state.imageOrder.length) { showCompletionScreen(); return; }
-
-  document.getElementById('rating-participant-name').textContent = (currentParticipantName || currentParticipant).toUpperCase();
-
+  const p = state.participants[currentParticipant];
+  currentImageIdx = p.ratings.length;
+  if (currentImageIdx >= state.imageOrder.length) {
+    showCompletionScreen();
+    return;
+  }
+  showScreen('rating');
+  document.getElementById('rating-participant-name').textContent =
+    (p.name || currentParticipant).toUpperCase();
+  // Build stars
   const sc = document.getElementById('stars-container');
   sc.innerHTML = '';
   for (let i = 1; i <= 10; i++) {
-    const b = document.createElement('button');
-    b.className = 'star'; b.textContent = i;
-    b.onclick = () => setRating(i);
-    sc.appendChild(b);
+    const s = document.createElement('button');
+    s.className = 'star';
+    s.textContent = i;
+    s.onclick = () => setRating(i);
+    sc.appendChild(s);
   }
-
-  showScreen('rating');
+  currentRating = 0;
   loadImage(currentImageIdx);
 }
 
@@ -1104,19 +1184,29 @@ function loadImage(idx) {
   document.getElementById('char-count').textContent = '0';
   document.querySelectorAll('.star').forEach(s => s.classList.remove('active'));
 
-  const total = state.imageOrder.length, pct = (idx / total) * 100;
+  const total = state.imageOrder.length;
+  const pct = (idx / total) * 100;
   document.getElementById('progress-text').textContent = `${idx} / ${total}`;
   document.getElementById('progress-fill').style.width = pct + '%';
+  ['m25','m50','m75'].forEach((id, i) => {
+    document.getElementById(id).classList.toggle('reached', idx >= total * (i+1) * 0.25);
+  });
   document.getElementById('image-counter-display').textContent = `${idx+1} / ${total}`;
-  ['m25','m50','m75'].forEach((id, i) => document.getElementById(id).classList.toggle('reached', idx >= total * (i+1) * 0.25));
 
   const img = state.imageOrder[idx];
-  const src = img?.photo || null;
+  const celeb = state.celebrities.find(c => c.id === img.celebId);
+  const src = celeb?.photos?.[img.photoIdx] || null;
   const display = document.getElementById('image-display');
+
   if (src) {
     const newImg = new Image();
-    newImg.className = 'fading'; newImg.alt = img.celebName || '';
-    newImg.onload = () => { display.innerHTML = ''; display.appendChild(newImg); requestAnimationFrame(() => newImg.classList.remove('fading')); };
+    newImg.className = 'fading';
+    newImg.alt = img.celebName || '';
+    newImg.onload = () => {
+      display.innerHTML = '';
+      display.appendChild(newImg);
+      requestAnimationFrame(() => newImg.classList.remove('fading'));
+    };
     newImg.src = src;
   } else {
     display.innerHTML = `<div class="image-placeholder"><div class="big-icon">◈</div><p>Image not available</p></div>`;
@@ -1131,45 +1221,79 @@ function setRating(val) {
 }
 
 function updateRatingFromSlider(val) { setRating(parseInt(val)); }
-function updateCharCount() { document.getElementById('char-count').textContent = document.getElementById('commentary-input').value.length; }
 
-async function submitRating() {
+function updateCharCount() {
+  document.getElementById('char-count').textContent =
+    document.getElementById('commentary-input').value.length;
+}
+
+function submitRating() {
   if (!currentRating) { showToast('Please give a rating (1–10)', 'error'); return; }
   const comment = document.getElementById('commentary-input').value.trim();
   if (!comment) { showToast('Please write a commentary', 'error'); return; }
-
-  const btn = document.getElementById('next-btn');
-  btn.disabled = true;
-  const img = state.imageOrder[currentImageIdx];
-
-  try {
-    await saveRatingToDB(currentParticipant, currentParticipantName, currentImageIdx, img, currentRating, comment);
-    // Also save to local state
-    if (!state.participants[currentParticipant]) state.participants[currentParticipant] = { name: currentParticipantName, ratings: [] };
-    state.participants[currentParticipant].ratings.push({ imageIdx: currentImageIdx, rating: currentRating, comment, ts: new Date().toISOString() });
-    saveLocal();
-  } catch(err) { showToast('Save error: ' + err.message, 'error'); btn.disabled = false; return; }
-
-  btn.disabled = false;
+  const p = state.participants[currentParticipant];
+  p.ratings.push({ imageIdx: currentImageIdx, rating: currentRating, comment, ts: new Date().toISOString() });
+  saveState();
   currentImageIdx++;
-  if (currentImageIdx >= state.imageOrder.length) showCompletionScreen();
-  else loadImage(currentImageIdx);
+  if (currentImageIdx >= state.imageOrder.length) {
+    showCompletionScreen();
+  } else {
+    loadImage(currentImageIdx);
+  }
 }
 
 function saveAndExit() {
-  saveLocal();
+  saveState();
   showToast('Progress saved ✓', 'success');
   setTimeout(() => showScreen('landing'), 800);
 }
+// --- সঠিক কানেকশন সেটিংস ---
+const SUPABASE_URL = 'https://wjufytpsvnvwqgsddstx.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_rQk8ZpNMVP1WTUXOWKfu3w_ZcSfrehS';
+const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
+// ডাটাবেজ কানেকশন চেক করার ফাংশন
+async function initDB() {
+    setLoading(true, 'Connecting to Database...');
+    const pill = document.getElementById('db-status-pill');
+    const lbl = document.getElementById('db-status-label');
+    
+    try {
+        // ১. ডাটাবেজ কানেকশন চেক করা
+        const { data, error } = await db.from('study_config').select('*').limit(1);
+        if (error) throw error;
+        
+        // ২. স্ট্যাটাস আপডেট (সবুজ বাতি)
+        if(pill) pill.className = 'db-pill connected';
+        if(lbl) lbl.textContent = 'Database Connected';
+
+        // ৩. ডাটাবেজ থেকে সব ডাটা লোড করা 
+        // (নিশ্চিত করুন এই ফাংশনটি আপনার ফাইলে আছে)
+        await loadStateFromSupabase(); 
+
+    } catch (err) {
+        console.error("Connection error:", err.message);
+        if(pill) pill.className = 'db-pill error';
+        if(lbl) lbl.textContent = 'Connection Failed';
+    } finally {
+        setLoading(false);
+    }
+}
+
+// পেজ লোড হলে রান হবে
+window.addEventListener('DOMContentLoaded', initDB);
+// ──────────────────────────────────────
+// COMPLETION
+// ──────────────────────────────────────
 function showCompletionScreen() {
   const p = state.participants[currentParticipant];
-  const ratings = p?.ratings || [];
+  const ratings = p.ratings || [];
   const avg = ratings.length ? (ratings.reduce((s,r) => s + r.rating, 0) / ratings.length).toFixed(1) : '—';
   const elapsed = sessionStart ? Math.round((Date.now() - sessionStart) / 60000) : 0;
+  const timeStr = elapsed < 60 ? elapsed + ' min' : (elapsed/60).toFixed(1) + ' hr';
   document.getElementById('complete-count').textContent = ratings.length;
   document.getElementById('complete-avg').textContent = avg;
-  document.getElementById('complete-time').textContent = elapsed < 60 ? elapsed + ' min' : (elapsed/60).toFixed(1) + ' hr';
+  document.getElementById('complete-time').textContent = timeStr;
   showScreen('complete');
 }
 </script>
